@@ -1,139 +1,151 @@
 body {
-    margin: 0;
-    font-family: 'Poppins', sans-serif;
-    /* background: linear-gradient(135deg, #1f1c2c, #928dab); */
-    background: #1f1c2c;
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    text-align: center;
-  }
-  
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  /* background: linear-gradient(135deg, #1f1c2c, #928dab); */
+  background: #1f1c2c;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  text-align: center;
+}
+
+h1 {
+  font-size: 3rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 15px 30px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #000;
+  background: seashell;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(255, 126, 179, 0.8);
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hidden {
+  display: none;
+}
+
+#game-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 500px;
+  font-size: 1.5rem;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+}
+
+#maze {
+  display: grid;
+  gap: 5px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.cell {
+  width: 40px;
+  height: 40px;
+  background: #ddd;
+  border-radius: 5px;
+}
+
+.cell.obstacle {
+  background: #e63946;
+}
+
+.cell.player {
+  background: #457b9d;
+}
+
+.cell.goal {
+  background: #2a9d8f;
+}
+
+#mobile-controls {
+  display: grid;
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  gap: 15px;
+  margin-top: 20px;
+}
+
+#mobile-controls button {
+  font-size: 2rem;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #ff7eb3;
+  border: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+#mobile-controls button:hover {
+  background: #ff4f85;
+  transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
   h1 {
-    font-size: 3rem;
-    font-weight: 600;
-    margin-bottom: 20px;
+    font-size: 2.5rem;
   }
-  
   button {
-    padding: 15px 30px;
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #000;
-    background: seashell;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 1.2rem;
+    padding: 12px 25px;
   }
-  
-  button:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 15px rgba(255, 126, 179, 0.8);
-  }
-  
-  .screen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .hidden {
-    display: none;
-  }
-  
-  #game-header {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 500px;
-    font-size: 1.5rem;
-    padding: 10px;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
-  }
-  
-  #maze {
-    display: grid;
-    gap: 5px;
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-  }
-  
   .cell {
-    width: 40px;
-    height: 40px;
-    background: #ddd;
-    border-radius: 5px;
+    width: 30px;
+    height: 30px;
   }
-  
-  .cell.obstacle {
-    background: #e63946;
-  }
-  
-  .cell.player {
-    background: #457b9d;
-  }
-  
-  .cell.goal {
-    background: #2a9d8f;
-  }
-  
-  #mobile-controls {
-    display: grid;
-    grid-template-areas:
-      ". up ."
-      "left . right"
-      ". down .";
-    gap: 15px;
-    margin-top: 20px;
-  }
-  
-  #mobile-controls button {
-    font-size: 2rem;
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    background: #ff7eb3;
-    border: none;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease-in-out;
-  }
-  
-  #mobile-controls button:hover {
-    background: #ff4f85;
-    transform: scale(1.1);
-  }
-  
-  @media (max-width: 768px) {
-    h1 {
-      font-size: 2.5rem;
-    }
-    button {
-      font-size: 1.2rem;
-      padding: 12px 25px;
-    }
-    .cell {
-      width: 30px;
-      height: 30px;
-    }
-  }
+}
 
 
 .time-popup {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 10px 15px;
-  border-radius: 5px;
-  font-size: 14px;
-  opacity: 1;
-  transition: opacity 0.5s ease-in-out;
+position: fixed;
+bottom: 20px;
+right: 20px;
+background: rgba(0, 0, 0, 0.8);
+color: white;
+padding: 10px 15px;
+border-radius: 5px;
+font-size: 14px;
+opacity: 1;
+transition: opacity 0.5s ease-in-out;
+}
+
+#game-over-screen button {
+  display: block;  /* Make buttons stack vertically */
+  margin: 20px auto; /* Adds spacing and centers buttons */
+  padding: 20px 40px; /* Adds padding for better appearance */
+  font-size: 30px; /* Makes text more readable */
+}
+
+
+#play-again-button {
+  margin-bottom: 20px;
 }
