@@ -22,6 +22,27 @@ let gameInterval;
 let showMazeTimeout;
 let isMazeVisible = true;
 
+// extra
+const playAgainButton = document.getElementById("play-again-button");
+
+// Add event listener for Play Again button
+playAgainButton.addEventListener("click", playAgain);
+
+function playAgain() {
+  // Hide game over screen and show game screen again
+  gameOverScreen.classList.add("hidden");
+  gameScreen.classList.remove("hidden");
+
+  // Reset player position, timer, and regenerate maze
+  playerPosition = { x: 0, y: 0 };
+  elapsedTime = 0;
+  timerRunning = false;
+  clearInterval(gameInterval);
+
+  // Start a new game at the same level
+  initializeLevel();
+}
+
 // Start Game
 playButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", restartGame);
@@ -229,9 +250,18 @@ function endGame() {
   gameOverScreen.classList.remove("hidden");
 }
 
+// Modify restartGame to go back to the main menu
 function restartGame() {
+  gameOverScreen.classList.add("hidden");
+  titleScreen.classList.remove("hidden");
+
+  // Reset all game state
   level = 1;
-  startGame();
+  elapsedTime = 0;
+  timerRunning = false;
+  clearInterval(gameInterval);
+  timerElement.textContent = "0.00";
+  levelElement.textContent = level;
 }
 
 document.addEventListener("keydown", (e) => {
