@@ -11,10 +11,14 @@
   <div id="title-screen" class="screen">
     <h1>FIGGLESNOOT</h1>
     <button id="play-button">PLAY AHHHH</button>
-  </div>
+    <div id="high-scores-container">
+      <h3>Best Scores:</h3>
+      <div id="high-scores"></div>
+    </div>
+  </div>  
   <div id="game-screen" class="screen hidden">
     <div id="game-header">
-      <div id="timer">TIME: <span id="timer-value">30</span>s</div>
+      <div id="timer">TIME: <span id="timer-value"></span></div>
       <div id="level">LEVEL: <span id="level-value">1</span></div>
     </div>
     <div id="maze"></div>
@@ -27,8 +31,11 @@
   </div>
   <div id="game-over-screen" class="screen hidden">
     <h1>YOU DIED!</h1>
-    <button id="restart-button">RESTART AHHH</button>
+    <!-- <p id="final-score">Final Time: 0.00s</p> -->
+    <h1 id="final-level" style="font-size: large;">Reached Level: 1</h1>
+    <button id="restart-button">BACK TO MAIN MENU</button>
   </div>
+  
   <script src="script.js"></script>
 </body>
 </html>
