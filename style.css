@@ -94,20 +94,37 @@ button:hover {
     ". up ."
     "left . right"
     ". down .";
-  gap: 15px;
+  gap: 10px;
   margin-top: 20px;
+  justify-content: center;
+  align-items: center;
 }
 
 #mobile-controls button {
   font-size: 2rem;
-  width: 70px;
-  height: 70px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: #ff7eb3;
   border: none;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
+
+#mobile-controls button:hover {
+  background: #ff4f85;
+  transform: scale(1.1);
+}
+
+/* Ensuring proper alignment of individual buttons */
+#up { grid-area: up; }
+#down { grid-area: down; }
+#left { grid-area: left; }
+#right { grid-area: right; }
+
 
 #mobile-controls button:hover {
   background: #ff4f85;
