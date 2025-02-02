@@ -232,12 +232,48 @@ function updateHUD() {
 function endGame() {
   clearTimeout(showMazeTimeout);
   clearInterval(gameInterval);
+
+  // EarthBound-style defeat messages (more natural, less forced)
+  const earthboundSayings = [
+    "Your journey ends here... for now.",
+    "The stars did not align in your favor.",
+    "You suddenly had the overwhelming urge to take a nap.",
+    "Everything went dark. Probably not a good sign.",
+    "Somewhere, a dog barked. It wasn’t impressed.",
+    "You felt a strange chill. Or maybe that was just failure.",
+    "You have been... gently removed from existence.",
+    "A mysterious force whispered, 'Maybe next time.'",
+    "You blinked. The world did not blink back.",
+    "A crow stole your last shred of dignity and flew off.",
+    "You saw the game over screen approaching. It waved.",
+    "You tripped, metaphorically and literally.",
+    "Your luck stat finally caught up with you.",
+    "A small child pointed and laughed. Somewhere.",
+    "You became a cautionary tale for future players.",
+    "A distant narrator shook their head in disappointment.",
+    "You heard a faint voice say, 'Oof, that looked painful.'",
+    "A frog nearby croaked. It sounded judgmental."
+  ];
+
+  // Pick a random EarthBound-style message
+  const randomSaying = earthboundSayings[Math.floor(Math.random() * earthboundSayings.length)];
+
+  // Update the game over screen
+  document.getElementById("death-level-display").innerHTML = `
+    <p>You reached Level ${level}.</p>
+    <p style="margin-top: 10px; font-style: italic; font-size: 1.2rem;">${randomSaying}</p>
+  `;
+
+  // Show game over screen
   gameScreen.classList.add("hidden");
   gameOverScreen.classList.remove("hidden");
 }
 
+
+
+
 function restartGame() {
-  level = 1;
+  level = 1; // Reset level when restarting
   startGame();
 }
 
@@ -276,12 +312,11 @@ function isMobile() {
 }
 
 document.querySelectorAll("#mobile-controls button").forEach(button => {
-  button.addEventListener("click", handleMove);
-  button.addEventListener("touchstart", handleMove, { passive: false });
+  button.addEventListener("pointerdown", handleMove);
 });
 
 function handleMove(e) {
-  e.preventDefault();  // Prevents zooming issues on mobile
+  e.preventDefault(); // Prevent zooming & unintended behaviors
 
   const id = e.target.id;
   if (id === "up") movePlayer(0, -1);
@@ -289,4 +324,3 @@ function handleMove(e) {
   if (id === "left") movePlayer(-1, 0);
   if (id === "right") movePlayer(1, 0);
 }
-
