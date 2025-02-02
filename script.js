@@ -298,20 +298,13 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-if (isMobile()) {
-  mobileControls.addEventListener("click", (e) => {
-    if (e.target.id === "up") movePlayer(0, -1);
-    if (e.target.id === "down") movePlayer(0, 1);
-    if (e.target.id === "left") movePlayer(-1, 0);
-    if (e.target.id === "right") movePlayer(1, 0);
-  });
-}
-
 function isMobile() {
   return /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
 }
 
+// Remove duplicate listeners and ensure only one handler is used
 document.querySelectorAll("#mobile-controls button").forEach(button => {
+  button.removeEventListener("pointerdown", handleMove); // Remove previous listener if exists
   button.addEventListener("pointerdown", handleMove);
 });
 
