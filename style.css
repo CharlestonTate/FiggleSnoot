@@ -1,3 +1,7 @@
+html, body {
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
@@ -148,4 +152,16 @@ transition: opacity 0.5s ease-in-out;
 
 #play-again-button {
   margin-bottom: 20px;
+}
+
+#control-canvas {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 200px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  touch-action: none;
 }
