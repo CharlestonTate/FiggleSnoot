@@ -255,3 +255,10 @@ if (isMobile()) {
 function isMobile() {
   return /Mobi|Android/i.test(navigator.userAgent);
 }
+
+document.querySelectorAll("#mobile-controls button").forEach(button => {
+  button.addEventListener("touchstart", (e) => {
+    e.preventDefault();  // Prevents zooming issues
+  }, { passive: false });
+});
+
