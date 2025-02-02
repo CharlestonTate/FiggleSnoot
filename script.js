@@ -33,7 +33,14 @@ function startGame() {
   titleScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
-  mobileControls.classList.toggle("hidden", !isMobile());
+
+  // Force mobile controls to show if on mobile
+  if (isMobile()) {
+    mobileControls.classList.remove("hidden");
+  } else {
+    mobileControls.classList.add("hidden");
+  }
+
   initializeLevel();
 }
 
@@ -235,11 +242,23 @@ function restartGame() {
 }
 
 document.addEventListener("keydown", (e) => {
-  switch (e.key) {
-    case "ArrowUp": movePlayer(0, -1); break;
-    case "ArrowDown": movePlayer(0, 1); break;
-    case "ArrowLeft": movePlayer(-1, 0); break;
-    case "ArrowRight": movePlayer(1, 0); break;
+  switch (e.key.toLowerCase()) {
+    case "arrowup":
+    case "w":
+      movePlayer(0, -1);
+      break;
+    case "arrowdown":
+    case "s":
+      movePlayer(0, 1);
+      break;
+    case "arrowleft":
+    case "a":
+      movePlayer(-1, 0);
+      break;
+    case "arrowright":
+    case "d":
+      movePlayer(1, 0);
+      break;
   }
 });
 
@@ -253,12 +272,21 @@ if (isMobile()) {
 }
 
 function isMobile() {
-  return /Mobi|Android/i.test(navigator.userAgent);
+  return /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
 }
 
 document.querySelectorAll("#mobile-controls button").forEach(button => {
-  button.addEventListener("touchstart", (e) => {
-    e.preventDefault();  // Prevents zooming issues
-  }, { passive: false });
+  button.addEventListener("click", handleMove);
+  button.addEventListener("touchstart", handleMove, { passive: false });
 });
+
+function handleMove(e) {
+  e.preventDefault();  // Prevents zooming issues on mobile
+
+  const id = e.target.id;
+  if (id === "up") movePlayer(0, -1);
+  if (id === "down") movePlayer(0, 1);
+  if (id === "left") movePlayer(-1, 0);
+  if (id === "right") movePlayer(1, 0);
+}
 
