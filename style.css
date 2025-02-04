@@ -101,7 +101,7 @@ button:hover {
 }
 
 #mobile-controls button {
-  font-size: 2.5rem; /* Increase icon size */
+  font-size: 1.8rem; /* Increase icon size */
   width: 80px; /* Increase button width */
   height: 80px; /* Increase button height */
   border-radius: 50%; /* Keep circular shape */
