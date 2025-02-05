@@ -252,7 +252,11 @@ function endGame() {
     "You became a cautionary tale for future players.",
     "A distant narrator shook their head in disappointment.",
     "You heard a faint voice say, 'Oof, that looked painful.'",
-    "A frog nearby croaked. It sounded judgmental."
+    "A frog nearby croaked. It sounded judgmental.",
+    "Wait... you're not Olivia??",
+    "My Grandfather can do better than this.",
+    "You were supposed to do gooder.",
+    "You got cooked"
   ];
 
   // Pick a random EarthBound-style message
