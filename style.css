@@ -5,7 +5,6 @@ html, body {
 body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
-  /* background: linear-gradient(135deg, #1f1c2c, #928dab); */
   background: #1f1c2c;
   color: white;
   display: flex;
@@ -94,25 +93,25 @@ button:hover {
     ". up ."
     "left . right"
     ". down .";
-  gap: 10px;
-  margin-top: 20px;
+  gap: 5px;
+  margin-top: 15px;
   justify-content: center;
   align-items: center;
 }
 
 #mobile-controls button {
-  font-size: 1.8rem; /* Increase icon size */
-  width: 80px; /* Increase button width */
-  height: 80px; /* Increase button height */
-  border-radius: 50%; /* Keep circular shape */
+  font-size: 1.8rem;
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
   background: #ff7eb3;
   border: none;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease-in-out;
   display: flex;
   justify-content: center;
   align-items: center;
-  touch-action: none; /* Prevent unintended behaviors */
+  touch-action: manipulation;
 }
 
 #mobile-controls button:hover {
@@ -120,53 +119,30 @@ button:hover {
   transform: scale(1.1);
 }
 
-/* Ensuring proper alignment of individual buttons */
 #up { grid-area: up; }
 #down { grid-area: down; }
 #left { grid-area: left; }
 #right { grid-area: right; }
 
-
-#mobile-controls button:hover {
-  background: #ff4f85;
-  transform: scale(1.1);
-}
-
-@media (max-width: 768px) {
-  h1 {
-    font-size: 2.5rem;
-  }
-  button {
-    font-size: 1.2rem;
-    padding: 12px 25px;
-  }
-  .cell {
-    width: 30px;
-    height: 30px;
-  }
-}
-
-
 .time-popup {
-position: fixed;
-bottom: 20px;
-right: 20px;
-background: rgba(0, 0, 0, 0.8);
-color: white;
-padding: 10px 15px;
-border-radius: 5px;
-font-size: 14px;
-opacity: 1;
-transition: opacity 0.5s ease-in-out;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-size: 14px;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
 }
 
 #game-over-screen button {
-  display: block;  /* Make buttons stack vertically */
-  margin: 20px auto; /* Adds spacing and centers buttons */
-  padding: 20px 40px; /* Adds padding for better appearance */
-  font-size: 30px; /* Makes text more readable */
+  display: block;
+  margin: 20px auto;
+  padding: 20px 40px;
+  font-size: 30px;
 }
-
 
 #play-again-button {
   margin-bottom: 20px;
@@ -185,5 +161,78 @@ transition: opacity 0.5s ease-in-out;
 }
 
 #mobile-controls button {
-  touch-action: none; /* Disables built-in browser delays */
+  touch-action: none;
+}
+
+/* Small Phones (Portrait) */
+@media (max-width: 480px) {
+  h1 {
+    font-size: 2rem;
+  }
+  button {
+    font-size: 1rem;
+    padding: 10px 20px;
+  }
+  .cell {
+    width: 25px;
+    height: 25px;
+  }
+  #game-header {
+    font-size: 1.2rem;
+  }
+  #mobile-controls {
+    gap: 3px;
+  }
+  #mobile-controls button {
+    font-size: 1.5rem;
+    width: 45px;
+    height: 45px;
+  }
+}
+
+/* Small Tablets and Large Phones (Landscape) */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.5rem;
+  }
+  button {
+    font-size: 1.2rem;
+    padding: 12px 25px;
+  }
+  .cell {
+    width: 30px;
+    height: 30px;
+  }
+  #mobile-controls button {
+    font-size: 1.8rem;
+    width: 55px;
+    height: 55px;
+  }
+}
+
+/* Tablets and Small Laptops */
+@media (max-width: 1024px) {
+  h1 {
+    font-size: 3rem;
+  }
+  button {
+    font-size: 1.4rem;
+    padding: 14px 28px;
+  }
+  .cell {
+    width: 35px;
+    height: 35px;
+  }
+}
+
+/* Large Screens */
+@media (min-width: 1200px) {
+  .cell {
+    width: 40px;
+    height: 40px;
+  }
+  #game-header {
+    max-width: 600px;
+    font-size: 1.8rem;
+  }
 }
