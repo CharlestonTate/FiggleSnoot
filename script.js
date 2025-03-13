@@ -21,6 +21,9 @@ let obstacles = [];
 let gameInterval;
 let showMazeTimeout;
 let isMazeVisible = true;
+let canMove = true;
+let canMoveInitially = false;
+const moveDelay = 100; // Delay in milliseconds between moves
 
 // Start Game
 playButton.addEventListener("click", startGame);
@@ -60,6 +63,12 @@ function initializeLevel() {
   renderMaze();
   updateHUD();
 
+  // Disable movement initially
+  canMoveInitially = false;
+  setTimeout(() => {
+    canMoveInitially = true;
+  }, 500); // Enable movement after 0.5 seconds
+
   // **Fix: Clear any existing maze timeout before setting a new one**
   if (showMazeTimeout) clearTimeout(showMazeTimeout);
 
@@ -70,8 +79,6 @@ function initializeLevel() {
   }, 3000);
 }
 
-
-
 function placeGoalNearPath(path) {
   const minDistance = Math.floor(gridSize / 2); // Ensure goal is at least halfway across the grid
   
@@ -81,9 +88,6 @@ function placeGoalNearPath(path) {
   // Pick a random far-away position if available, otherwise default to the last path cell
   return farPathCells.length > 0 ? farPathCells[Math.floor(Math.random() * farPathCells.length)] : path[path.length - 1];
 }
-
-
-
 
 function generateMaze(size, path, goal) {
   const obstacles = [];
@@ -102,7 +106,6 @@ function generateMaze(size, path, goal) {
   }
   return obstacles;
 }
-
 
 function generatePath(size) {
   const path = [{ x: 0, y: 0 }];
@@ -152,6 +155,8 @@ function renderMaze() {
 }
 
 function movePlayer(dx, dy) {
+  if (!canMove || !canMoveInitially) return;
+
   const newX = playerPosition.x + dx;
   const newY = playerPosition.y + dy;
 
@@ -171,8 +176,12 @@ function movePlayer(dx, dy) {
       endGame();
     }
   }
-}
 
+  canMove = false;
+  setTimeout(() => {
+    canMove = true;
+  }, moveDelay);
+}
 
 function checkWin() {
   if (playerPosition.x === goalPosition.x && playerPosition.y === goalPosition.y) {
@@ -193,7 +202,6 @@ function stopTimer() {
   timerRunning = false;
 }
 
-
 function showTimePopup(time) {
   let popup = document.createElement("div");
   popup.classList.add("time-popup");
@@ -206,7 +214,6 @@ function showTimePopup(time) {
     setTimeout(() => popup.remove(), 500); // Remove after fade-out
   }, 2000);
 }
-
 
 function startTimer() {
   if (timerRunning) return; // Prevent multiple intervals
@@ -227,7 +234,6 @@ function updateHUD() {
   timerElement.textContent = `${seconds}.${milliseconds.toString().padStart(2, '0')}`;
   levelElement.textContent = level;
 }
-
 
 function endGame() {
   clearTimeout(showMazeTimeout);
@@ -272,8 +278,6 @@ function endGame() {
   gameScreen.classList.add("hidden");
   gameOverScreen.classList.remove("hidden");
 }
-
-
 
 
 function restartGame() {
