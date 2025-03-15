@@ -10,6 +10,7 @@ const levelElement = document.getElementById("level-value");
 const mobileControls = document.getElementById("mobile-controls");
 
 // Game Variables
+let isGameOver = false;
 let gridSize = 7;
 let level = 1;
 let startTime = null;
@@ -21,9 +22,6 @@ let obstacles = [];
 let gameInterval;
 let showMazeTimeout;
 let isMazeVisible = true;
-let canMove = true;
-let canMoveInitially = false;
-const moveDelay = 100; // Delay in milliseconds between moves
 
 // Start Game
 playButton.addEventListener("click", startGame);
@@ -63,12 +61,6 @@ function initializeLevel() {
   renderMaze();
   updateHUD();
 
-  // Disable movement initially
-  canMoveInitially = false;
-  setTimeout(() => {
-    canMoveInitially = true;
-  }, 500); // Enable movement after 0.5 seconds
-
   // **Fix: Clear any existing maze timeout before setting a new one**
   if (showMazeTimeout) clearTimeout(showMazeTimeout);
 
@@ -79,6 +71,8 @@ function initializeLevel() {
   }, 3000);
 }
 
+
+
 function placeGoalNearPath(path) {
   const minDistance = Math.floor(gridSize / 2); // Ensure goal is at least halfway across the grid
   
@@ -88,6 +82,9 @@ function placeGoalNearPath(path) {
   // Pick a random far-away position if available, otherwise default to the last path cell
   return farPathCells.length > 0 ? farPathCells[Math.floor(Math.random() * farPathCells.length)] : path[path.length - 1];
 }
+
+
+
 
 function generateMaze(size, path, goal) {
   const obstacles = [];
@@ -106,6 +103,7 @@ function generateMaze(size, path, goal) {
   }
   return obstacles;
 }
+
 
 function generatePath(size) {
   const path = [{ x: 0, y: 0 }];
@@ -155,7 +153,7 @@ function renderMaze() {
 }
 
 function movePlayer(dx, dy) {
-  if (!canMove || !canMoveInitially) return;
+  if (isGameOver) return; // Prevent movement if the game is over
 
   const newX = playerPosition.x + dx;
   const newY = playerPosition.y + dy;
@@ -176,12 +174,8 @@ function movePlayer(dx, dy) {
       endGame();
     }
   }
-
-  canMove = false;
-  setTimeout(() => {
-    canMove = true;
-  }, moveDelay);
 }
+
 
 function checkWin() {
   if (playerPosition.x === goalPosition.x && playerPosition.y === goalPosition.y) {
@@ -202,6 +196,7 @@ function stopTimer() {
   timerRunning = false;
 }
 
+
 function showTimePopup(time) {
   let popup = document.createElement("div");
   popup.classList.add("time-popup");
@@ -214,6 +209,7 @@ function showTimePopup(time) {
     setTimeout(() => popup.remove(), 500); // Remove after fade-out
   }, 2000);
 }
+
 
 function startTimer() {
   if (timerRunning) return; // Prevent multiple intervals
@@ -235,7 +231,9 @@ function updateHUD() {
   levelElement.textContent = level;
 }
 
+
 function endGame() {
+  isGameOver = true; // Set the game over flag
   clearTimeout(showMazeTimeout);
   clearInterval(gameInterval);
 
@@ -280,7 +278,9 @@ function endGame() {
 }
 
 
+
 function restartGame() {
+  isGameOver = false; // Reset the game over flag
   level = 1; // Reset level when restarting
   startGame();
 }
@@ -317,6 +317,8 @@ document.querySelectorAll("#mobile-controls button").forEach(button => {
 });
 
 function handleMove(e) {
+  if (isGameOver) return; // Prevent movement if the game is over
+
   e.preventDefault(); // Prevent zooming & unintended behaviors
 
   const id = e.target.id;
