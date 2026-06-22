@@ -1,6 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function validMode(mode) {
+      return mode in ['base', 'timeAttack', 'blackout'];
+    }
+
+    function validLeaderboardEntry() {
+      return request.resource.data.keys().hasAll(['level', 'time', 'displayName'])
+        && request.resource.data.level is int
+        && request.resource.data.level >= 1
+        && request.resource.data.level <= 500
+        && request.resource.data.time is number
+        && request.resource.data.time >= 0
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 20;
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create: if request.auth != null && request.auth.uid == userId;
@@ -10,7 +26,15 @@ service cloud.firestore {
 
     match /leaderboards/{mode}/entries/{userId} {
       allow read: if true;
-      allow write: if false;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && validMode(mode)
+        && validLeaderboardEntry();
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && validMode(mode)
+        && validLeaderboardEntry();
+      allow delete: if false;
     }
   }
 }

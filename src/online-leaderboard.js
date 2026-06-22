@@ -1,10 +1,10 @@
 import { httpsCallable } from 'firebase/functions';
 import {
-  collection, getDocs, query, orderBy, limit,
+  collection, doc, getDocs, query, orderBy, limit, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { db, functions, isFirebaseConfigured } from './firebase.js';
-import { isSignedIn, getCurrentUser } from './auth.js';
+import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 
 const MODE_LABELS = {
@@ -12,6 +12,36 @@ const MODE_LABELS = {
   timeAttack: 'Time Attack',
   blackout: 'Blackout',
 };
+
+const RANK_1_MESSAGES = [
+  'Wow you are the best in the world',
+  'I honestly have nothing bad to say',
+  'You are pretty good... for now.',
+  'Tate wants to dap you up for this.',
+];
+
+const RANK_2_MESSAGES = [
+  'Second... really?',
+  'That was good, but not great.',
+  'To be the best you need to beat the best',
+];
+
+const RANK_3_MESSAGES = [
+  'Bronze medal energy. Keep grinding.',
+  'Third place — podium finish, not perfection.',
+  'So close to greatness. One more run.',
+];
+
+function pickRandom(messages) {
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
+function getRankFlavorMessage(rank) {
+  if (rank === 1) return pickRandom(RANK_1_MESSAGES);
+  if (rank === 2) return pickRandom(RANK_2_MESSAGES);
+  if (rank === 3) return pickRandom(RANK_3_MESSAGES);
+  return null;
+}
 
 function isBetter(a, b, mode) {
   if (a.level !== b.level) return a.level > b.level;
@@ -51,6 +81,30 @@ async function fetchAllEntries(mode) {
   return snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
 }
 
+async function submitScoreDirect(mode, level, time, uid) {
+  if (!db) return null;
+
+  const entries = await fetchAllEntries(mode);
+  const existing = entries.find((e) => e.uid === uid);
+  const run = { level, time };
+
+  if (existing && !isBetter(run, existing, mode)) {
+    return null;
+  }
+
+  const displayName = getDisplayName() || getCurrentUser()?.email?.split('@')[0] || 'Player';
+  await setDoc(doc(db, 'leaderboards', mode, 'entries', uid), {
+    level,
+    time,
+    displayName,
+    updatedAt: serverTimestamp(),
+  });
+
+  const updated = await fetchAllEntries(mode);
+  const globalRank = computeGlobalRank(updated, run, mode);
+  return { globalRank, isNewPB: true };
+}
+
 export async function getScoreComparison(mode, level, time) {
   if (!isFirebaseConfigured || !isOnline()) return null;
 
@@ -72,23 +126,30 @@ export async function getScoreComparison(mode, level, time) {
     return result.data;
   } catch (err) {
     console.warn('Cloud compare unavailable, using Firestore fallback:', err);
-    try {
-      return await runLocalCompare();
-    } catch (fallbackErr) {
-      console.warn('Local compare failed:', fallbackErr);
-      throw err;
-    }
+    return runLocalCompare();
   }
 }
 
 export async function submitScore(mode, level, time) {
-  if (!isFirebaseConfigured || !functions || !isOnline()) return null;
+  if (!isFirebaseConfigured || !isOnline()) return null;
+
+  const uid = getCurrentUser()?.uid;
+  if (!uid) return null;
+
+  if (functions) {
+    try {
+      const fn = httpsCallable(functions, 'submitScore');
+      const result = await withTimeout(fn({ mode, level, time }));
+      return result.data;
+    } catch (err) {
+      console.warn('Cloud submit unavailable, saving to Firestore directly:', err);
+    }
+  }
+
   try {
-    const fn = httpsCallable(functions, 'submitScore');
-    const result = await withTimeout(fn({ mode, level, time }));
-    return result.data;
+    return await submitScoreDirect(mode, level, time, uid);
   } catch (err) {
-    console.warn('Score submit unavailable:', err);
+    console.warn('Direct score save failed:', err);
     return null;
   }
 }
@@ -108,27 +169,42 @@ function describeOnlineError(err) {
 }
 
 export function fireConfetti() {
-  const duration = 2500;
+  const duration = 3200;
   const end = Date.now() + duration;
+  const colors = ['#ff7eb3', '#457b9d', '#2a9d8f', '#FFE393', '#ffffff', '#ffb347'];
+
+  confetti({
+    particleCount: 150,
+    spread: 120,
+    origin: { x: 0.5, y: 0.5 },
+    startVelocity: 55,
+    gravity: 0.9,
+    scalar: 1.2,
+    colors,
+  });
 
   const frame = () => {
     confetti({
-      particleCount: 4,
-      angle: 60,
-      spread: 55,
-      origin: { x: 0, y: 0.7 },
-      colors: ['#ff7eb3', '#457b9d', '#2a9d8f', '#FFE393'],
-    });
-    confetti({
-      particleCount: 4,
-      angle: 120,
-      spread: 55,
-      origin: { x: 1, y: 0.7 },
-      colors: ['#ff7eb3', '#457b9d', '#2a9d8f', '#FFE393'],
+      particleCount: 20,
+      spread: 360,
+      origin: { x: 0.5, y: 0.5 },
+      startVelocity: 35,
+      ticks: 80,
+      scalar: 1.1,
+      colors,
     });
     if (Date.now() < end) requestAnimationFrame(frame);
   };
   frame();
+}
+
+function renderPersonalBestMessage(rank) {
+  const flavor = getRankFlavorMessage(rank);
+  return `
+    <p class="online-death-pb">New personal best!</p>
+    <p class="online-death-rank">Global rank: #${rank ?? '?'}</p>
+    ${flavor ? `<p class="online-death-flavor">${flavor}</p>` : ''}
+  `;
 }
 
 /**
@@ -176,25 +252,9 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
 
     if (isGlobalPB) {
       const submit = await submitScore(mode, level, time);
-      if (submit?.globalRank) {
-        fireConfetti();
-        container.innerHTML = `
-          <p class="online-death-pb">New global personal best!</p>
-          <p class="online-death-rank">Global rank: #${submit.globalRank}</p>
-        `;
-      } else {
-        const rank = currentGlobalRank ?? computeGlobalRank(
-          await fetchAllEntries(mode),
-          { level, time },
-          mode
-        );
-        fireConfetti();
-        container.innerHTML = `
-          <p class="online-death-pb">New personal best!</p>
-          <p class="online-death-rank">Estimated rank: #${rank ?? '?'}</p>
-          <p class="online-death-hint">Global save pending — server setup in progress.</p>
-        `;
-      }
+      const rank = submit?.globalRank ?? currentGlobalRank;
+      fireConfetti();
+      container.innerHTML = renderPersonalBestMessage(rank);
     } else {
       const n = countBetter ?? 0;
       const people = n === 1 ? '1 person is' : `${n} people are`;
@@ -216,10 +276,20 @@ export async function fetchTopScores(mode, topN = 25) {
   );
 
   const snap = await withTimeout(getDocs(q));
-  return snap.docs.map((docSnap, index) => ({
-    rank: index + 1,
+  const entries = snap.docs.map((docSnap) => ({
     uid: docSnap.id,
     ...docSnap.data(),
+  }));
+
+  entries.sort((a, b) => {
+    if (b.level !== a.level) return b.level - a.level;
+    if (mode === 'timeAttack') return (b.time ?? 0) - (a.time ?? 0);
+    return (a.time ?? 0) - (b.time ?? 0);
+  });
+
+  return entries.map((entry, index) => ({
+    rank: index + 1,
+    ...entry,
   }));
 }
 
@@ -237,12 +307,12 @@ export function renderGlobalScores(container, scores, mode) {
     return;
   }
 
-  scores.forEach((score, index) => {
+  scores.forEach((score) => {
     const entry = document.createElement('div');
     entry.classList.add('score-entry');
     const label = getModeLabel(mode);
     entry.innerHTML = `
-      <div class="rank">${index + 1}.</div>
+      <div class="rank">${score.rank}.</div>
       <div class="mode">${score.displayName || 'Anonymous'}</div>
       <div class="score">Level ${score.level || 1}</div>
       <div class="date">${label}</div>

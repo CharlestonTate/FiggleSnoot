@@ -2725,6 +2725,17 @@ input:checked + .toggle-slider:before {
   text-align: center;
 }
 
+.online-death-flavor {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: #FFE393;
+  margin: 12px 0 4px;
+  width: 100%;
+  text-align: center;
+  max-width: 360px;
+  line-height: 1.4;
+}
+
 .account-from-death-btn {
   margin-top: 12px;
   font-size: 1.1rem !important;
