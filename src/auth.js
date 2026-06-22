@@ -24,8 +24,28 @@ export function isSignedIn() {
 
 async function loadUserProfile(uid) {
   if (!db) return null;
-  const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? snap.data() : null;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.warn('Could not load user profile:', err);
+    return null;
+  }
+}
+
+export function mapAuthError(err) {
+  const code = err?.code || '';
+  const messages = {
+    'auth/email-already-in-use': 'That email is already registered. Try Sign In.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/wrong-password': 'Wrong password.',
+    'auth/invalid-credential': 'Wrong email or password.',
+    'auth/user-not-found': 'No account found with that email.',
+    'auth/too-many-requests': 'Too many attempts. Wait a moment and try again.',
+    'permission-denied': 'Firestore rules not deployed yet. Run: firebase deploy --only firestore:rules',
+  };
+  return messages[code] || err?.message || 'Something went wrong. Try again.';
 }
 
 export function initAuth(onAuthChange) {
@@ -37,8 +57,12 @@ export function initAuth(onAuthChange) {
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     if (user) {
-      const profile = await loadUserProfile(user.uid);
-      currentDisplayName = profile?.displayName || user.email?.split('@')[0] || 'Player';
+      try {
+        const profile = await loadUserProfile(user.uid);
+        currentDisplayName = profile?.displayName || user.email?.split('@')[0] || 'Player';
+      } catch {
+        currentDisplayName = user.email?.split('@')[0] || 'Player';
+      }
     } else {
       currentDisplayName = null;
     }
@@ -59,11 +83,15 @@ export async function signUp(email, password, displayName) {
   }
 
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  await setDoc(doc(db, 'users', cred.user.uid), {
-    displayName: trimmedName,
-    email: email.trim(),
-    createdAt: serverTimestamp(),
-  });
+  try {
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      displayName: trimmedName,
+      email: email.trim(),
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    throw new Error(mapAuthError(err));
+  }
   currentDisplayName = trimmedName;
   return cred.user;
 }

@@ -1,4 +1,7 @@
-// Sound Test Menu Handler
+// Sound Test Menu Handler (easter egg — only active during gameplay)
+import { gameScreen } from './dom-elements.js';
+import { selectSound } from './audio.js';
+
 let keySequence = [];
 const secretSequence = ['Enter', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowRight', 'Enter'];
 let soundTestVisible = false;
@@ -202,27 +205,25 @@ function closeSoundTest() {
     }
 }
 
-// Handle key sequence
+// Handle key sequence (only while game screen is visible)
 document.addEventListener('keydown', (event) => {
-    if (!gameScreen.classList.contains('hidden')) {
-            keySequence.push(event.key);
-            
-            // Keep only the last 8 keys
-            if (keySequence.length > 8) {
-                keySequence.shift();
-            }
+  if (!gameScreen || gameScreen.classList.contains('hidden')) return;
 
-            // Check if sequence matches
-            if (keySequence.join(',') === secretSequence.join(',')) {
-                if (!soundTestVisible) {
-                    createSoundTestMenu();
-                    soundTestVisible = true;
-                    keySequence = []; // Reset sequence
-                    selectSound.currentTime = 0;
-                    selectSound.play();
-            }
-        }
+  keySequence.push(event.key);
+
+  if (keySequence.length > 8) {
+    keySequence.shift();
+  }
+
+  if (keySequence.join(',') === secretSequence.join(',')) {
+    if (!soundTestVisible) {
+      createSoundTestMenu();
+      soundTestVisible = true;
+      keySequence = [];
+      selectSound.currentTime = 0;
+      selectSound.play().catch(() => {});
     }
+  }
 });
 
 // Initialize sound test menu

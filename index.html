@@ -187,11 +187,15 @@
     </div>
   </div>
   <div id="game-over-screen" class="screen hidden">
-    <h1 style="font-size: 3em;">YOU DIED!</h1>
-    <h2 id="death-level-display"></h2>
-    <div id="online-death-message" class="online-death-message hidden"></div>
-    <button id="restart-button">PLAY AGAIN AHHHH</button>
-    <button id="menu-button" style="margin-top: 20px;">BACK TO MENU</button>
+    <div class="death-screen-panel">
+      <h1 class="death-title">YOU DIED!</h1>
+      <div id="death-level-display" class="death-stats"></div>
+      <div id="online-death-message" class="online-death-message hidden"></div>
+      <div class="death-actions">
+        <button type="button" id="restart-button" class="menu-button death-action-btn">PLAY AGAIN AHHHH</button>
+        <button type="button" id="menu-button" class="menu-button death-action-btn">BACK TO MENU</button>
+      </div>
+    </div>
   </div>
   
   <div id="bomb-confirmation-popup" class="screen hidden">

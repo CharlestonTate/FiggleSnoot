@@ -1960,111 +1960,124 @@ input:checked + .toggle-slider:before {
   }
 }
 
-/* Death Screen Animations */
+/* Death Screen */
 #game-over-screen {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(31, 28, 44, 0.9);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  inset: 0;
   z-index: 1000;
-  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
   box-sizing: border-box;
+  background-color: rgba(31, 28, 44, 0.92);
+  overflow-y: auto;
 }
 
 #game-over-screen.hidden {
   display: none;
 }
 
-#game-over-screen h1 {
-  opacity: 1;
-  animation: moveUp 0.5s ease-out forwards;
-  animation-delay: 0.5s;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.death-screen-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.death-title {
   margin: 0;
-  text-align: center;
-  width: 100%;
-  max-width: 600px;
+  font-size: clamp(2rem, 9vw, 3rem);
+  line-height: 1.1;
+  animation: deathTitleIn 0.55s ease-out forwards;
 }
 
-#game-over-screen h2 {
+.death-stats {
+  width: 100%;
   opacity: 0;
-  animation: fadeInScale 0.5s ease-out forwards;
-  animation-delay: 1.3s;
-  margin-top: 80px;
-  /* margin-top: 20px; */
-  /* ^^^ this screws up death screen for some reason */
-  text-align: center;
-  width: 100%;
-  max-width: 600px;
+  animation: deathContentIn 0.5s ease-out 0.45s forwards;
 }
 
-#game-over-screen button {
+.death-stats p {
+  margin: 0;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  line-height: 1.4;
+}
+
+.death-flavor-text {
+  margin-top: 10px !important;
+  font-style: italic;
+  font-size: clamp(0.95rem, 3.5vw, 1.15rem) !important;
+  opacity: 0.9;
+}
+
+.death-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.death-action-btn {
+  width: 100%;
+  margin: 0 !important;
   opacity: 0;
-  animation: fadeInScale 0.5s ease-out forwards;
-  animation-delay: 1.8s;
-  margin: 10px 0;
-  width: 100%;
-  max-width: 300px;
+  animation: deathContentIn 0.5s ease-out 1.1s forwards;
 }
 
-@keyframes moveUp {
-  0% {
-    top: 50%;
-    transform: translate(-50%, -50%);
-  }
-  100% {
-    top: 30%;
-    transform: translate(-50%, -50%);
-  }
+.death-actions .death-action-btn:nth-child(2) {
+  animation-delay: 1.25s;
 }
 
-@keyframes fadeInScale {
-  0% {
+@keyframes deathTitleIn {
+  from {
     opacity: 0;
-    transform: scale(0.8);
+    transform: translateY(12px) scale(0.95);
   }
-  100% {
+  to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
-/* High Score Styles */
+@keyframes deathContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* High Score on death screen */
 .highscore-container {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin: 15px 0 32px 0;
-  flex-wrap: nowrap;
+  margin: 8px 0;
+  flex-wrap: wrap;
   width: 100%;
-  max-width: 600px;
   text-align: center;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
 }
 
 .highscore-text {
   color: #FFD700;
-  font-size: 1.2em;
+  font-size: clamp(1rem, 4vw, 1.2em);
   font-weight: bold;
   margin: 0;
   text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .trophy {
@@ -2073,56 +2086,15 @@ input:checked + .toggle-slider:before {
   align-items: center;
 }
 
-/* Responsive styles for death screen */
-@media screen and (max-width: 768px) {
-  #game-over-screen h1 {
-    font-size: 2.5em;
-  }
-  
-  .highscore-text {
-    font-size: 1.1em;
-  }
-  
-  .trophy {
-    font-size: 1.1em;
-  }
-  
-  #game-over-screen button {
-    font-size: 1em;
-    padding: 15px;
-  }
-}
-
 @media screen and (max-width: 480px) {
-  #game-over-screen h1 {
-    font-size: 2em;
+  .death-screen-panel {
+    gap: 12px;
+    padding: 8px 4px;
   }
-  
-  .highscore-text {
-    font-size: 1em;
-  }
-  
-  .trophy {
-    font-size: 1em;
-  }
-  
-  #game-over-screen button {
-    font-size: 0.9em;
-    padding: 12px;
-  }
-  
-  .highscore-container {
-    gap: 8px;
-  }
-}
 
-/* Add smooth transitions for all elements */
-#game-over-screen * {
-  transition: all 0.3s ease-in-out;
-}
-
-#restart-button {
-  margin-top: 48px !important;
+  .death-actions {
+    gap: 10px;
+  }
 }
 
 .cell.player.cat-mode {
@@ -2374,18 +2346,12 @@ input:checked + .toggle-slider:before {
     min-height: 65px;
   }
 
-  #game-over-screen #death-level-display {
-    margin-top: 100px;
-    margin-bottom: 40px;
+  #game-over-screen .death-stats p {
+    font-size: 0.95rem;
   }
 
-  #game-over-screen #death-level-display p {
-    margin-bottom: 15px;
-    font-size: 15px;
-  }
-
-  #game-over-screen button {
-    margin-top: 30px;
+  .death-actions .death-action-btn {
+    padding: 14px 16px;
   }
 
   .score-entry {
@@ -2680,36 +2646,56 @@ input:checked + .toggle-slider:before {
 
 /* Online death screen messages */
 .online-death-message {
-  margin: 16px auto;
-  max-width: 400px;
+  width: 100%;
+  opacity: 0;
+  animation: deathContentIn 0.5s ease-out 0.75s forwards;
 }
 
 .online-death-message.hidden {
   display: none;
 }
 
+.death-online-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+}
+
 .online-death-hint {
-  font-size: 1.1rem;
+  font-size: clamp(0.95rem, 3.5vw, 1.05rem);
   font-style: italic;
-  margin: 10px 0;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.online-death-subhint {
+  font-size: 0.85rem;
+  margin: 0;
+  opacity: 0.65;
 }
 
 .online-death-pb {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: #FFE393;
-  margin: 8px 0;
+  margin: 0;
 }
 
 .online-death-rank {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 600;
-  margin: 8px 0;
+  margin: 0;
 }
 
-.account-from-death-btn {
-  margin-top: 12px;
-  font-size: 1.1rem !important;
-  padding: 12px 24px !important;
+.death-online-cta .death-action-btn {
+  animation: none;
+  opacity: 1;
+  max-width: 100%;
 }
 
