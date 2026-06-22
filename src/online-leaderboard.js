@@ -1,10 +1,10 @@
 import { httpsCallable } from 'firebase/functions';
 import {
-  collection, query, orderBy, limit, getDocs,
+  collection, getDocs, query, orderBy, limit,
 } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { db, functions, isFirebaseConfigured } from './firebase.js';
-import { isSignedIn } from './auth.js';
+import { isSignedIn, getCurrentUser } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 
 const MODE_LABELS = {
@@ -13,22 +13,98 @@ const MODE_LABELS = {
   blackout: 'Blackout',
 };
 
+function isBetter(a, b, mode) {
+  if (a.level !== b.level) return a.level > b.level;
+  if (mode === 'timeAttack') return a.time > b.time;
+  return a.time < b.time;
+}
+
+function countBetterThan(entries, run, mode, excludeUid = null) {
+  return entries.filter((entry) => {
+    if (excludeUid && entry.uid === excludeUid) return false;
+    return isBetter(entry, run, mode);
+  }).length;
+}
+
+function computeGlobalRank(entries, run, mode) {
+  return countBetterThan(entries, run, mode) + 1;
+}
+
+function compareScoreLocally(entries, mode, level, time, uid) {
+  const run = { level, time, uid };
+  const existing = entries.find((e) => e.uid === uid) || null;
+  const countBetter = countBetterThan(entries, run, mode);
+  const isGlobalPB = !existing || isBetter(run, existing, mode);
+  const currentGlobalRank = isGlobalPB
+    ? computeGlobalRank(entries, run, mode)
+    : (existing ? computeGlobalRank(entries, existing, mode) : null);
+  return { countBetter, isGlobalPB, currentGlobalRank };
+}
+
 export function getModeLabel(mode) {
   return MODE_LABELS[mode] || mode;
 }
 
+async function fetchAllEntries(mode) {
+  if (!db) return [];
+  const snap = await withTimeout(getDocs(collection(db, 'leaderboards', mode, 'entries')));
+  return snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
+}
+
 export async function getScoreComparison(mode, level, time) {
-  if (!isFirebaseConfigured || !functions || !isOnline()) return null;
-  const fn = httpsCallable(functions, 'getScoreComparison');
-  const result = await withTimeout(fn({ mode, level, time }));
-  return result.data;
+  if (!isFirebaseConfigured || !isOnline()) return null;
+
+  const uid = getCurrentUser()?.uid;
+  if (!uid) return null;
+
+  const runLocalCompare = async () => {
+    const entries = await fetchAllEntries(mode);
+    return compareScoreLocally(entries, mode, level, time, uid);
+  };
+
+  if (!functions) {
+    return runLocalCompare();
+  }
+
+  try {
+    const fn = httpsCallable(functions, 'getScoreComparison');
+    const result = await withTimeout(fn({ mode, level, time }));
+    return result.data;
+  } catch (err) {
+    console.warn('Cloud compare unavailable, using Firestore fallback:', err);
+    try {
+      return await runLocalCompare();
+    } catch (fallbackErr) {
+      console.warn('Local compare failed:', fallbackErr);
+      throw err;
+    }
+  }
 }
 
 export async function submitScore(mode, level, time) {
   if (!isFirebaseConfigured || !functions || !isOnline()) return null;
-  const fn = httpsCallable(functions, 'submitScore');
-  const result = await withTimeout(fn({ mode, level, time }));
-  return result.data;
+  try {
+    const fn = httpsCallable(functions, 'submitScore');
+    const result = await withTimeout(fn({ mode, level, time }));
+    return result.data;
+  } catch (err) {
+    console.warn('Score submit unavailable:', err);
+    return null;
+  }
+}
+
+function describeOnlineError(err) {
+  const code = err?.code || '';
+  if (code === 'functions/not-found' || code === 'functions/unavailable') {
+    return 'Global ranking server is not set up yet (Firebase Blaze plan required).';
+  }
+  if (code === 'unauthenticated') {
+    return 'Sign in to compare your score globally.';
+  }
+  if (err?.message?.includes('Failed to fetch') || code === 'auth/network-request-failed') {
+    return 'Network blocked — try disabling ad blockers or use another browser.';
+  }
+  return 'Could not reach leaderboard — local scores saved.';
 }
 
 export function fireConfetti() {
@@ -92,27 +168,40 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
   try {
     const comparison = await getScoreComparison(mode, level, time);
     if (!comparison) {
-      container.innerHTML = '<p class="online-death-hint">Could not reach leaderboard.</p>';
+      container.innerHTML = '<p class="online-death-hint">Could not load global scores.</p>';
       return;
     }
 
-    const { countBetter, isGlobalPB } = comparison;
+    const { countBetter, isGlobalPB, currentGlobalRank } = comparison;
 
     if (isGlobalPB) {
       const submit = await submitScore(mode, level, time);
-      const rank = submit?.globalRank;
-      fireConfetti();
-      container.innerHTML = `
-        <p class="online-death-pb">New global personal best!</p>
-        <p class="online-death-rank">Global rank: #${rank ?? '?'}</p>
-      `;
+      if (submit?.globalRank) {
+        fireConfetti();
+        container.innerHTML = `
+          <p class="online-death-pb">New global personal best!</p>
+          <p class="online-death-rank">Global rank: #${submit.globalRank}</p>
+        `;
+      } else {
+        const rank = currentGlobalRank ?? computeGlobalRank(
+          await fetchAllEntries(mode),
+          { level, time },
+          mode
+        );
+        fireConfetti();
+        container.innerHTML = `
+          <p class="online-death-pb">New personal best!</p>
+          <p class="online-death-rank">Estimated rank: #${rank ?? '?'}</p>
+          <p class="online-death-hint">Global save pending — server setup in progress.</p>
+        `;
+      }
     } else {
       const n = countBetter ?? 0;
       const people = n === 1 ? '1 person is' : `${n} people are`;
       container.innerHTML = `<p class="online-death-hint">${people} better than you</p>`;
     }
   } catch (err) {
-    container.innerHTML = '<p class="online-death-hint">Could not reach leaderboard — local scores saved.</p>';
+    container.innerHTML = `<p class="online-death-hint">${describeOnlineError(err)}</p>`;
     console.warn('Online score error:', err);
   }
 }
