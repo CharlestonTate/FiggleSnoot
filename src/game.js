@@ -698,7 +698,9 @@ function handleDeath(mode, gameState) {
     // Add the death message after a longer delay
     setTimeout(() => {
       const messageElement = document.createElement('p');
-      messageElement.classList.add('death-flavor-text');
+      messageElement.style.marginTop = '10px';
+      messageElement.style.fontStyle = 'italic';
+      messageElement.style.fontSize = '1.2rem';
       messageElement.textContent = deathMessage.deathMessage;
       deathDisplay.appendChild(messageElement);
       

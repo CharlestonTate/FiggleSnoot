@@ -205,25 +205,27 @@ function closeSoundTest() {
     }
 }
 
-// Handle key sequence (only while game screen is visible)
+// Handle key sequence
 document.addEventListener('keydown', (event) => {
-  if (!gameScreen || gameScreen.classList.contains('hidden')) return;
+    if (!gameScreen || gameScreen.classList.contains('hidden')) return;
 
-  keySequence.push(event.key);
+    keySequence.push(event.key);
+            
+            // Keep only the last 8 keys
+            if (keySequence.length > 8) {
+                keySequence.shift();
+            }
 
-  if (keySequence.length > 8) {
-    keySequence.shift();
-  }
-
-  if (keySequence.join(',') === secretSequence.join(',')) {
-    if (!soundTestVisible) {
-      createSoundTestMenu();
-      soundTestVisible = true;
-      keySequence = [];
-      selectSound.currentTime = 0;
-      selectSound.play().catch(() => {});
-    }
-  }
+            // Check if sequence matches
+            if (keySequence.join(',') === secretSequence.join(',')) {
+                if (!soundTestVisible) {
+                    createSoundTestMenu();
+                    soundTestVisible = true;
+                    keySequence = []; // Reset sequence
+                    selectSound.currentTime = 0;
+                    selectSound.play().catch(() => {});
+            }
+        }
 });
 
 // Initialize sound test menu

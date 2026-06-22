@@ -6,6 +6,7 @@ import {
 } from './bootstrap-online.js';
 import { createAccountNav } from './menu-nav.js';
 import { playSound, dungSound, selectSound } from './audio.js';
+import { mapFirebaseError } from './firebase-errors.js';
 
 let wired = false;
 
@@ -108,7 +109,7 @@ export function initAccountScreen() {
       clearAccountMessage();
       refreshAccountUI();
     } catch (e) {
-      showAccountMessage(e?.message || 'Sign up failed.');
+      showAccountMessage(mapFirebaseError(e));
     }
   });
 
@@ -125,7 +126,7 @@ export function initAccountScreen() {
       clearAccountMessage();
       refreshAccountUI();
     } catch (e) {
-      showAccountMessage(e?.message || 'Sign in failed.');
+      showAccountMessage(mapFirebaseError(e));
     }
   });
 
@@ -139,7 +140,7 @@ export function initAccountScreen() {
       }
       refreshAccountUI();
     } catch (e) {
-      showAccountMessage(e?.message || 'Sign out failed.');
+      showAccountMessage(mapFirebaseError(e));
     }
   });
 
@@ -156,7 +157,7 @@ export function initAccountScreen() {
       await withAuthAction((auth) => auth.resetPassword(email));
       showAccountMessage('Password reset email sent.', { success: true });
     } catch (e) {
-      showAccountMessage(e?.message || 'Could not send reset email.');
+      showAccountMessage(mapFirebaseError(e));
     }
   });
 

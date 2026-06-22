@@ -33,21 +33,6 @@ async function loadUserProfile(uid) {
   }
 }
 
-export function mapAuthError(err) {
-  const code = err?.code || '';
-  const messages = {
-    'auth/email-already-in-use': 'That email is already registered. Try Sign In.',
-    'auth/weak-password': 'Password must be at least 6 characters.',
-    'auth/invalid-email': 'Enter a valid email address.',
-    'auth/wrong-password': 'Wrong password.',
-    'auth/invalid-credential': 'Wrong email or password.',
-    'auth/user-not-found': 'No account found with that email.',
-    'auth/too-many-requests': 'Too many attempts. Wait a moment and try again.',
-    'permission-denied': 'Firestore rules not deployed yet. Run: firebase deploy --only firestore:rules',
-  };
-  return messages[code] || err?.message || 'Something went wrong. Try again.';
-}
-
 export function initAuth(onAuthChange) {
   if (!isFirebaseConfigured || !auth) {
     onAuthChange?.(null, null);
@@ -83,15 +68,11 @@ export async function signUp(email, password, displayName) {
   }
 
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  try {
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      displayName: trimmedName,
-      email: email.trim(),
-      createdAt: serverTimestamp(),
-    });
-  } catch (err) {
-    throw new Error(mapAuthError(err));
-  }
+  await setDoc(doc(db, 'users', cred.user.uid), {
+    displayName: trimmedName,
+    email: email.trim(),
+    createdAt: serverTimestamp(),
+  });
   currentDisplayName = trimmedName;
   return cred.user;
 }

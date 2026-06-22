@@ -78,14 +78,11 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
 
   if (!isSignedIn()) {
     container.innerHTML = `
-      <div class="death-online-cta">
-        <p class="online-death-hint">Want to see how you rank globally?</p>
-        <button type="button" class="menu-button death-action-btn" id="death-go-account">Create Account</button>
-        <p class="online-death-subhint">Or sign in from Menu → Account</p>
-      </div>
+      <p class="online-death-hint">Make an account to compare your score!</p>
+      <button type="button" class="menu-button account-from-death-btn" id="death-go-account">Create Account</button>
     `;
     document.getElementById('death-go-account')?.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('menus:go-account'));
+      window.dispatchEvent(new CustomEvent('navigate:account'));
     });
     return;
   }
