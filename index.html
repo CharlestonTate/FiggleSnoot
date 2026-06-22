@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FIGGLESNOOT</title>
+  <link rel="icon" href="img/figgle1.png">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Xterm.js CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+  <!-- Xterm.js and Addons -->
+  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
+  <!-- Hammer.js for swipe controls -->
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+</head>
+<body>
+  <div id="title-screen" class="screen">
+    <div class="title-container">
+      <h1>FIGGLESNOOT</h1>
+      <span class="beta-text">(beta)</span>
+    </div>
+    <button id="play-button">PLAY AHHHH<br></button>
+    <span style="font-size: 1em; color: gray;">PRESS ENTER</span>
+    <div id="high-scores-container">
+      <!-- <h3>Best Scores:</h3> -->
+      <div id="high-scores"></div>
+    </div>
+  </div>  
+
+  <div id="menu-screen" class="screen hidden">
+    <div class="coin-counter" aria-label="Coins">
+      <span id="coin-count">0</span>
+      <span class="coin-label">coins</span>
+    </div>
+    <h1>MENU</h1>
+    <div class="menu-buttons">
+      <button id="play-game-button" class="menu-button selected">Play</button>
+      <button id="leaderboard-button" class="menu-button">Leaderboard</button>
+      <button id="settings-button" class="menu-button">Settings</button>
+      <button id="account-button" class="menu-button">Account</button>
+      <button id="credits-button" class="menu-button">Credits</button>
+      <button id="back-button" class="menu-button">Back</button>
+    </div>
+  </div>
+
+  <div id="game-mode-screen" class="screen hidden">
+    <h1>Select Game Mode</h1>
+    <button id="normal-mode-button" class="menu-button">Normal Mode</button>
+    <button id="time-attack-button" class="menu-button">Time Attack</button>
+    <button id="blackout-button" class="menu-button">Blackout Mode</button>
+    <button id="back-to-menu-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="leaderboard-menu-screen" class="screen hidden">
+    <h1>Leaderboard</h1>
+    <div class="menu-buttons horizontal-buttons">
+      <button id="personal-leaderboard-button" class="menu-button big-button">
+        <span class="emoji">📋</span>
+        <span class="button-text">Personal</span>
+      </button>
+      <button id="global-leaderboard-button" class="menu-button big-button">
+        <span class="emoji">🌍</span>
+        <span class="button-text">Global</span>
+      </button>
+    </div>
+    <button id="back-from-leaderboard-button" class="menu-button back-button">Back</button>
+  </div>
+
+  <div id="personal-leaderboard-screen" class="screen hidden">
+    <h1>Personal Best Scores</h1>
+    <div id="personal-scores-container" class="scores-container" style="display: none;"></div>
+    <div class="menu-buttons">
+      <button id="normal-mode-scores-button" class="menu-button">Normal Mode</button>
+      <button id="time-attack-scores-button" class="menu-button">Time Attack</button>
+      <button id="blackout-scores-button" class="menu-button">Blackout Mode</button>
+      <button id="back-from-personal-button" class="menu-button">Back</button>
+    </div>
+  </div>
+
+  <div id="global-leaderboard-screen" class="screen hidden">
+    <h1>Global Leaderboard</h1>
+    <div class="menu-buttons global-mode-tabs">
+      <button id="global-normal-tab" class="menu-button selected" data-mode="base">Normal</button>
+      <button id="global-time-attack-tab" class="menu-button" data-mode="timeAttack">Time Attack</button>
+      <button id="global-blackout-tab" class="menu-button" data-mode="blackout">Blackout</button>
+    </div>
+    <div id="global-scores-container" class="scores-container"></div>
+    <p id="global-scores-status" class="global-scores-status"></p>
+    <button id="back-from-global-button" class="menu-button selected">Back</button>
+  </div>
+
+  <div id="normal-mode-scores-screen" class="screen hidden">
+    <h1>Normal Mode High Scores</h1>
+    <div id="normal-scores-container" class="scores-container"></div>
+    <button id="back-from-normal-scores-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="time-attack-scores-screen" class="screen hidden">
+    <h1>Time Attack High Scores</h1>
+    <div id="time-attack-scores-container" class="scores-container"></div>
+    <button id="back-from-time-attack-scores-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="blackout-scores-screen" class="screen hidden">
+    <h1>Blackout Mode High Scores</h1>
+    <div id="blackout-scores-container" class="scores-container"></div>
+    <button id="back-from-blackout-scores-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="settings-screen" class="screen hidden">
+    <h1>Settings</h1>
+    <div class="settings-container">
+      <div class="setting-item">
+        <span class="setting-label">Sound Effects</span>
+        <div class="toggle-switch">
+          <input type="checkbox" id="sound-toggle" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">Walking Sound</span>
+        <div class="toggle-switch">
+          <input type="checkbox" id="walking-sound-toggle" checked>
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">Cat Mode</span>
+        <div class="toggle-switch">
+          <input type="checkbox" id="cat-toggle">
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">Jazz</span>
+        <div class="toggle-switch">
+          <input type="checkbox" id="jazz-toggle">
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">Swipe Controls</span>
+        <div class="toggle-switch">
+          <input type="checkbox" id="swipe-toggle">
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+    </div>
+    <button id="settings-back-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="account-screen" class="screen hidden">
+    <h1>Account</h1>
+    <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
+    <p id="account-error" class="account-error hidden"></p>
+    <div id="account-signed-out" class="account-form">
+      <input type="text" id="account-displayname-input" class="account-input" placeholder="Display name (signup)" maxlength="20" autocomplete="nickname">
+      <input type="email" id="account-email" class="account-input" placeholder="Email" autocomplete="email">
+      <input type="password" id="account-password" class="account-input" placeholder="Password" autocomplete="current-password">
+      <div class="account-auth-row">
+        <button type="button" id="account-signin-button" class="menu-button selected">Sign In</button>
+        <button type="button" id="account-signup-button" class="menu-button">Sign Up</button>
+      </div>
+      <button type="button" id="account-reset-password-button" class="menu-button account-link-btn">Forgot Password?</button>
+    </div>
+    <div id="account-signed-in" class="account-signed-in hidden">
+      <p>Playing as <strong id="account-display-name"></strong></p>
+      <button type="button" id="account-signout-button" class="menu-button">Sign Out</button>
+    </div>
+    <button type="button" id="account-back-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="game-screen" class="screen hidden">
+    <div id="game-header">
+      <div id="timer">TIME: <span id="timer-value"></span></div>
+      <div id="level">LEVEL: <span id="level-value">1</span></div>
+    </div>
+    <div id="maze"></div>
+    <div id="mobile-controls" class="hidden">
+      <button id="up">&#9650;</button>
+      <button id="left">&#9664;</button>
+      <button id="right">&#9654;</button>
+      <button id="down">&#9660;</button>
+    </div>
+  </div>
+  <div id="game-over-screen" class="screen hidden">
+    <h1 style="font-size: 3em;">YOU DIED!</h1>
+    <h2 id="death-level-display"></h2>
+    <div id="online-death-message" class="online-death-message hidden"></div>
+    <button id="restart-button">PLAY AGAIN AHHHH</button>
+    <button id="menu-button" style="margin-top: 20px;">BACK TO MENU</button>
+  </div>
+  
+  <div id="bomb-confirmation-popup" class="screen hidden">
+    <h1>Clear All Scores?</h1>
+    <div class="menu-buttons">
+      <button id="confirm-bomb-button" class="menu-button"><span class="quiver-text">Yes, Clear All</span></button>
+      <button id="cancel-bomb-button" class="menu-button">Back</button>
+    </div>
+  </div>
+  
+  <!-- Game modules -->
+  <script type="module" src="src/main.js"></script>
+  
+  <!-- Add console container -->
+  <div id="console-container" style="display:none; width:100%; height:200px; position:fixed; bottom:0; left:0; z-index:1000;"></div>
+</body>
+</html>
