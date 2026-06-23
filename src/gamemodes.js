@@ -110,7 +110,7 @@ const GameModes = {
     base: new BaseGameMode({
         name: 'Normal',
         description: 'Classic FiggleSnoot gameplay',
-        initialTimer: 30,
+        initialTimer: 20,
         mazeTimeout: 3000
     }),
 

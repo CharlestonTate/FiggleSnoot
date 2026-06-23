@@ -10,6 +10,7 @@ import {
 import { walkingSoundEnabled, catModeEnabled } from './settings.js';
 import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold } from './controls.js';
 import { GameModes, initializeGameMode, handleLevelComplete } from './gamemodes.js';
+import { withTrustedStorageWrite } from './integrity.js';
 
 let isGameOver = false;
 let gridSize = 7;
@@ -31,6 +32,15 @@ let isTimeAttackMode = false;
 let timer;
 let isDeathAnimationPlaying = false;
 let hasMovedThisLevel = false;
+
+function usesCountdownTimer() {
+  return currentGameMode === 'timeAttack' || currentGameMode === 'base';
+}
+
+function getModeInitialTimer() {
+  const modeConfig = GameModes[currentGameMode];
+  return modeConfig?.initialTimer ?? 20;
+}
 
 export function setCurrentGameMode(mode) {
   currentGameMode = mode;
@@ -71,8 +81,8 @@ export function startGame() {
   level = 1;
   elapsedTime = 0;
   timerRunning = false;
-  remainingTime = 5;
-  
+  remainingTime = getModeInitialTimer();
+
   if (gameInterval) clearInterval(gameInterval);
   if (showMazeTimeout) clearTimeout(showMazeTimeout);
 
@@ -111,15 +121,24 @@ export function startGame() {
   obstacles = initializedState.obstacles;
 
   initializeLevel();
+
+  import('./bootstrap-online.js')
+    .then(({ bootstrapOnlineServices, getOnlineModule }) =>
+      bootstrapOnlineServices().then(() => getOnlineModule()))
+    .then((online) => online?.startOnlineRun?.(currentGameMode))
+    .catch(() => {});
 }
 
 function initializeLevel() {
-  if (currentGameMode === 'timeAttack') {
-    timer = remainingTime; // Use remaining time for time attack mode
-    isTimeAttackMode = true;
+  isTimeAttackMode = currentGameMode === 'timeAttack';
+
+  if (usesCountdownTimer()) {
+    if (currentGameMode === 'base') {
+      remainingTime = getModeInitialTimer();
+    }
+    timer = remainingTime;
   } else {
-    timer = 30;
-    isTimeAttackMode = false;
+    timer = GameModes.blackout?.initialTimer ?? 40;
   }
 
   // Grid increases every 5 levels and resets every 5-level cycle
@@ -252,7 +271,9 @@ function trySpawnCoin(path, goal, spawn) {
 
 function setCoinCount(count) {
   const n = Math.max(0, parseInt(count, 10) || 0);
-  localStorage.setItem('figglesnoot_coins', String(n));
+  withTrustedStorageWrite(() => {
+    localStorage.setItem('figglesnoot_coins', String(n));
+  });
   updateCoinDisplay();
 }
 
@@ -490,6 +511,9 @@ function checkWin() {
       remainingTime = Math.min(20, remainingTime + 2);
       timer = remainingTime;
       showTimeChangePopup(2, true);
+    } else if (currentGameMode === 'base') {
+      remainingTime = getModeInitialTimer();
+      timer = remainingTime;
     }
 
     const gameState = {
@@ -544,17 +568,15 @@ function startTimer() {
   timerRunning = true;
 
   gameInterval = setInterval(() => {
-    if (isTimeAttackMode) {
-      // Update remaining time for time attack mode
+    if (usesCountdownTimer()) {
       const currentTime = performance.now();
       const timePassed = (currentTime - startTime) / 1000;
       remainingTime = Math.max(0, timer - timePassed);
-      
+
       if (remainingTime <= 0) {
         endGame();
         return;
       }
-      // Update the timer display immediately
       timerElement.textContent = remainingTime.toFixed(1);
     } else {
       elapsedTime = performance.now() - startTime;
@@ -566,8 +588,7 @@ function startTimer() {
 }
 
 function updateHUD() {
-  if (isTimeAttackMode) {
-    // Display remaining time for time attack mode with one decimal place
+  if (usesCountdownTimer()) {
     timerElement.textContent = remainingTime.toFixed(1);
   } else {
     let seconds = Math.floor(elapsedTime / 1000);
@@ -594,10 +615,12 @@ function endGame() {
   scores.push({
     mode: currentGameMode,
     level: level || 1, // Ensure level is at least 1
-    time: isTimeAttackMode ? remainingTime : elapsedTime,
+    time: usesCountdownTimer() ? remainingTime : elapsedTime,
     date: new Date().toISOString()
   });
-  localStorage.setItem('figglesnoot_scores', JSON.stringify(scores));
+  withTrustedStorageWrite(() => {
+    localStorage.setItem('figglesnoot_scores', JSON.stringify(scores));
+  });
 
   // Handle death based on game mode
   const gameState = {
@@ -632,7 +655,7 @@ function endGame() {
       return online.handleOnlineScoreResult({
         mode: currentGameMode,
         level: level || 1,
-        time: isTimeAttackMode ? remainingTime : elapsedTime,
+        time: usesCountdownTimer() ? remainingTime : elapsedTime,
       });
     })
     .catch((err) => console.warn('Online score skipped:', err));
@@ -762,6 +785,8 @@ export function initGameControls() {
 }
 
 export function initConsole() {
+  if (import.meta.env.PROD) return;
+
   document.addEventListener('keydown', (event) => {
     if (event.key === '/' && !consoleVisible) {
       event.preventDefault();

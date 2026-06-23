@@ -47,7 +47,6 @@ export function renderAccountStatsHtml() {
       <h2 class="account-stats-title">Your Stats</h2>
       <p class="account-stat-summary">Total games: <strong>${totalGames}</strong> · Overall best: <strong>Lv ${overallBest ?? '—'}</strong></p>
       ${rows}
-      <p class="account-stat-hint">Personal scores: Leaderboard → Personal → 💣 clears a mode. Account → Delete global scores removes online entries.</p>
     </div>
   `;
 }

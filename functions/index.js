@@ -9,7 +9,9 @@ const MODES = new Set(['base', 'timeAttack', 'blackout']);
 const MAX_LEVEL = 500;
 const MAX_TIME = 86400000;
 const SUBMIT_COOLDOWN_MS = 15000;
-const MAX_LEVEL_JUMP = 50;
+const MAX_LEVEL_JUMP = 5;
+const MIN_MS_PER_LEVEL = 2500;
+const MAX_RUN_MS = 3600000;
 
 const lastSubmitByUid = new Map();
 
@@ -39,6 +41,10 @@ function entryRef(mode, uid) {
   return db.collection('leaderboards').doc(mode).collection('entries').doc(uid);
 }
 
+function runRef(runId) {
+  return db.collection('runs').doc(runId);
+}
+
 async function fetchAllEntries(mode) {
   const snap = await db.collection('leaderboards').doc(mode).collection('entries').get();
   return snap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
@@ -51,8 +57,8 @@ function countBetterThan(entries, run, mode, excludeUid = null) {
   }).length;
 }
 
-function computeGlobalRank(entries, run, mode) {
-  return countBetterThan(entries, run, mode) + 1;
+function computeGlobalRank(entries, run, mode, excludeUid = null) {
+  return countBetterThan(entries, run, mode, excludeUid) + 1;
 }
 
 async function getUserDisplayName(uid) {
@@ -60,6 +66,117 @@ async function getUserDisplayName(uid) {
   const data = userDoc.data();
   return data?.displayName || 'Anonymous';
 }
+
+async function writeLeaderboardEntry(mode, uid, level, time) {
+  const run = { level, time };
+  const existingSnap = await entryRef(mode, uid).get();
+  const existing = existingSnap.exists ? existingSnap.data() : null;
+
+  if (existing && !isBetter(run, existing, mode)) {
+    throw new HttpsError('failed-precondition', 'Score is not a personal best.');
+  }
+
+  const displayName = await getUserDisplayName(uid);
+  await entryRef(mode, uid).set({
+    level,
+    time,
+    displayName,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  const entries = await fetchAllEntries(mode);
+  const globalRank = computeGlobalRank(entries, run, mode, uid);
+  return { globalRank, isNewPB: true };
+}
+
+function assertSubmitCooldown(uid) {
+  const now = Date.now();
+  const lastSubmit = lastSubmitByUid.get(uid) || 0;
+  if (now - lastSubmit < SUBMIT_COOLDOWN_MS) {
+    throw new HttpsError('resource-exhausted', 'Please wait before submitting again.');
+  }
+  lastSubmitByUid.set(uid, now);
+}
+
+function assertPlausibleLevel(level, startedAt) {
+  const elapsedMs = Date.now() - startedAt;
+  if (elapsedMs > MAX_RUN_MS) {
+    throw new HttpsError('deadline-exceeded', 'Run expired.');
+  }
+  const maxLevel = Math.floor(elapsedMs / MIN_MS_PER_LEVEL) + 1;
+  if (level > maxLevel) {
+    throw new HttpsError('invalid-argument', 'Level not plausible for run duration.');
+  }
+}
+
+export const startRun = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in to start a ranked run.');
+  }
+
+  const { mode } = request.data || {};
+  validateMode(mode);
+  const uid = request.auth.uid;
+  const now = Date.now();
+  const ref = db.collection('runs').doc(`${uid}_${mode}`);
+
+  await ref.set({
+    uid,
+    mode,
+    startedAt: now,
+    status: 'active',
+    peakLevel: 0,
+  });
+
+  return { runId: ref.id, serverTime: now };
+});
+
+export const submitRun = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in to submit scores.');
+  }
+
+  const { runId, level, time } = request.data || {};
+  if (!runId || typeof runId !== 'string') {
+    throw new HttpsError('invalid-argument', 'Missing run id.');
+  }
+
+  validateScorePayload(level, time);
+  assertSubmitCooldown(request.auth.uid);
+
+  const snap = await runRef(runId).get();
+  if (!snap.exists) {
+    throw new HttpsError('not-found', 'Invalid run.');
+  }
+
+  const run = snap.data();
+  const uid = request.auth.uid;
+  if (run.uid !== uid) {
+    throw new HttpsError('permission-denied', 'Run does not belong to this account.');
+  }
+  if (run.status !== 'active') {
+    throw new HttpsError('failed-precondition', 'Run already submitted.');
+  }
+
+  const mode = run.mode;
+  validateMode(mode);
+  assertPlausibleLevel(level, run.startedAt);
+
+  if (level > (run.peakLevel || 0) + MAX_LEVEL_JUMP) {
+    throw new HttpsError('invalid-argument', 'Level increase exceeds allowed limit.');
+  }
+
+  const result = await writeLeaderboardEntry(mode, uid, level, time);
+
+  await runRef(runId).update({
+    status: 'completed',
+    submittedLevel: level,
+    submittedTime: time,
+    completedAt: Date.now(),
+  });
+
+  return result;
+});
 
 export const getScoreComparison = onCall(async (request) => {
   if (!request.auth) {
@@ -75,55 +192,58 @@ export const getScoreComparison = onCall(async (request) => {
   const entries = await fetchAllEntries(mode);
   const existing = entries.find((e) => e.uid === uid) || null;
 
-  const countBetter = countBetterThan(entries, run, mode);
+  const countBetter = countBetterThan(entries, run, mode, uid);
   const isGlobalPB = !existing || isBetter(run, existing, mode);
   const currentGlobalRank = isGlobalPB
-    ? computeGlobalRank(entries, run, mode)
-    : (existing ? computeGlobalRank(entries, existing, mode) : null);
+    ? computeGlobalRank(entries, run, mode, uid)
+    : (existing ? computeGlobalRank(entries, existing, mode, uid) : null);
 
   return { countBetter, isGlobalPB, currentGlobalRank };
 });
 
+/** Legacy alias — requires runId; use submitRun directly from the client. */
 export const submitScore = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in to submit scores.');
   }
 
-  const { mode, level, time } = request.data || {};
-  validateMode(mode);
+  const { runId, level, time } = request.data || {};
+  if (!runId) {
+    throw new HttpsError('failed-precondition', 'Ranked submit requires a run session. Start a new game while signed in.');
+  }
+
   validateScorePayload(level, time);
+  assertSubmitCooldown(request.auth.uid);
 
+  const snap = await runRef(runId).get();
+  if (!snap.exists) {
+    throw new HttpsError('not-found', 'Invalid run.');
+  }
+
+  const run = snap.data();
   const uid = request.auth.uid;
-  const now = Date.now();
-  const lastSubmit = lastSubmitByUid.get(uid) || 0;
-  if (now - lastSubmit < SUBMIT_COOLDOWN_MS) {
-    throw new HttpsError('resource-exhausted', 'Please wait before submitting again.');
+  if (run.uid !== uid) {
+    throw new HttpsError('permission-denied', 'Run does not belong to this account.');
+  }
+  if (run.status !== 'active') {
+    throw new HttpsError('failed-precondition', 'Run already submitted.');
   }
 
-  const run = { level, time };
-  const existingSnap = await entryRef(mode, uid).get();
-  const existing = existingSnap.exists ? existingSnap.data() : null;
+  validateMode(run.mode);
+  assertPlausibleLevel(level, run.startedAt);
 
-  if (existing && !isBetter(run, existing, mode)) {
-    throw new HttpsError('failed-precondition', 'Score is not a personal best.');
-  }
-
-  if (existing && level > existing.level + MAX_LEVEL_JUMP) {
+  if (level > (run.peakLevel || 0) + MAX_LEVEL_JUMP) {
     throw new HttpsError('invalid-argument', 'Level increase exceeds allowed limit.');
   }
 
-  const displayName = await getUserDisplayName(uid);
-  await entryRef(mode, uid).set({
-    level,
-    time,
-    displayName,
-    updatedAt: FieldValue.serverTimestamp(),
+  const result = await writeLeaderboardEntry(run.mode, uid, level, time);
+
+  await runRef(runId).update({
+    status: 'completed',
+    submittedLevel: level,
+    submittedTime: time,
+    completedAt: Date.now(),
   });
 
-  lastSubmitByUid.set(uid, now);
-
-  const entries = await fetchAllEntries(mode);
-  const globalRank = computeGlobalRank(entries, run, mode);
-
-  return { globalRank, isNewPB: true };
+  return result;
 });

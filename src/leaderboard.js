@@ -8,6 +8,7 @@ import {
   leaderboardButtons,
 } from './dom-elements.js';
 import { switchScreens, hideScreen, showScreen } from './screens.js';
+import { withTrustedStorageWrite } from './integrity.js';
 import {
   playSound, selectSound, dungSound, badWiggleSound, boomSmallSound,
 } from './audio.js';
@@ -235,6 +236,20 @@ function markSeenOnlineLeaderboard() {
   localStorage.setItem(SEEN_ONLINE_KEY, '1');
 }
 
+/** Dev/lab helper — run `__FIGGLE_DEV__.resetGlobalIntro()` in the browser console to replay COMING SOON. */
+export function resetGlobalIntro() {
+  localStorage.removeItem(SEEN_ONLINE_KEY);
+  console.log('[FiggleSnoot] Global intro reset. Open Leaderboard → Global to replay the cat explosion.');
+  return true;
+}
+
+if (!import.meta.env.PROD && typeof window !== 'undefined') {
+  window.__FIGGLE_DEV__ = {
+    ...(window.__FIGGLE_DEV__ || {}),
+    resetGlobalIntro,
+  };
+}
+
 function showGlobalComingSoon() {
   document.getElementById('global-coming-soon')?.classList.remove('hidden');
   document.getElementById('global-leaderboard-content')?.classList.add('hidden');
@@ -361,9 +376,11 @@ function clearScores() {
   const modeToClear = modeMap[currentClearingContainer.id];
 
   if (modeToClear) {
-    localStorage.setItem('figglesnoot_scores', JSON.stringify(
-      scores.filter((score) => score.mode !== modeToClear)
-    ));
+    withTrustedStorageWrite(() => {
+      localStorage.setItem('figglesnoot_scores', JSON.stringify(
+        scores.filter((score) => score.mode !== modeToClear)
+      ));
+    });
     hideBombConfirmation();
     const currentScreen = currentClearingContainer.closest('.screen');
     if (currentScreen?.id === 'normal-mode-scores-screen') displayNormalModeScores();

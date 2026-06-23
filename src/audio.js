@@ -72,4 +72,6 @@ export function advanceMovementSound() {
   nextMovementSound = nextMovementSound === patterSound ? pitterSound : patterSound;
 }
 
-window.playSound = playSound;
+if (!import.meta.env.PROD && typeof window !== 'undefined') {
+  window.playSound = playSound;
+}

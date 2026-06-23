@@ -49,15 +49,31 @@ In [Firebase Console](https://console.firebase.google.com/) → project **figgle
 
 ---
 
-## 3. Deploy Cloud Functions + Firestore rules
+## 3. Deploy Firestore rules (required)
 
-Global score submit/compare runs on Firebase, not Netlify. Deploy once (and again when you change `functions/` or `firestore.rules`):
+Global leaderboard works on the **free Spark plan** via Firestore rules + client save (no Blaze needed).
+
+Deploy rules after changes:
 
 ```bash
 firebase login
 cd "path/to/FiggleSnoot"
+firebase deploy --only firestore:rules
+```
+
+### Optional: Cloud Functions (requires Blaze)
+
+Stronger anti-cheat (`startRun` / `submitRun` server validation) is **optional**. If you skip Blaze:
+
+- Auth, Firestore, global leaderboard read/write, and accounts all work on Spark
+- Firestore rules enforce: own entry only, valid fields, personal-best only, max +5 level jump per update
+- A determined cheater can still tamper via DevTools (same as any browser game without a server)
+
+To enable Functions later:
+
+```bash
 cd functions && npm install && cd ..
-firebase deploy --only functions,firestore:rules
+firebase deploy --only functions
 ```
 
 Project is already set in `.firebaserc` (`figglesnootdb`).
@@ -114,10 +130,56 @@ Copy `.env.example` to `.env` for local Firebase config.
 
 ---
 
-## 7. App Check (optional)
+## 7. App Check (recommended for anti-cheat)
 
-1. Firebase Console → App Check → register web app (reCAPTCHA v3)
-2. Add `VITE_FIREBASE_APP_CHECK_SITE_KEY` to Netlify
-3. Enforce App Check for Firestore and Cloud Functions in console
+1. Firebase Console → **App Check** → register web app (reCAPTCHA v3)
+2. Add `VITE_FIREBASE_APP_CHECK_SITE_KEY` to Netlify env vars
+3. Firebase Console → App Check → **Enforce** for **Cloud Functions** (and optionally Firestore reads)
+4. Redeploy Netlify after adding the env var
 
-For local App Check debug, register a debug token in Firebase Console → App Check → Manage debug tokens.
+For local App Check debug, register a debug token in Firebase Console → App Check → Manage debug tokens. Debug mode is **dev-only** in `src/firebase.js`.
+
+---
+
+## 8. Anti-cheat architecture (ranked / global leaderboard)
+
+| Layer | What it does |
+|-------|----------------|
+| **Cloud Functions** | `startRun` + `submitRun` validate signed-in runs, elapsed time, and max level before writing scores |
+| **Firestore rules** | Clients **cannot** create/update leaderboard entries; only Functions (Admin SDK) write scores |
+| **App Check** | Reduces scripted/bot abuse of callables |
+| **No client fallback** | Removed direct Firestore score writes — ranked submit requires an active run session |
+
+Deploy after changes:
+
+```bash
+cd functions && npm install && cd ..
+firebase deploy --only functions,firestore:rules
+```
+
+**Requires Firebase Blaze (pay-as-you-go)** only if you deploy Cloud Functions. **Not required** for normal global leaderboard operation.
+
+### Ranked run flow
+
+1. Signed-in player starts a game → client calls `startRun({ mode })` → server creates `runs/{uid}_{mode}`
+2. On death with a global PB → client calls `submitRun({ runId, level, time })` → server validates plausibility and writes leaderboard
+3. Starting a new game while signed in replaces the run doc for that mode
+
+Personal/local scores in `localStorage` remain client-side (low stakes).
+
+---
+
+## 9. Restrict Firebase API key (Google Cloud Console)
+
+The Firebase web API key is public in the bundle — restrict **where** it can be used:
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → project **figglesnootdb**
+2. **APIs & Services → Credentials** → select the **Browser key** used by Firebase
+3. **Application restrictions** → **HTTP referrers**
+4. Add:
+   - `https://figglesnoot.netlify.app/*`
+   - `http://localhost:*/*` (local dev)
+   - `http://127.0.0.1:*/*` (local dev)
+5. **API restrictions** → restrict to Firebase-related APIs (Identity Toolkit, Firestore, etc.)
+
+This does not hide the key but blocks use from other websites.

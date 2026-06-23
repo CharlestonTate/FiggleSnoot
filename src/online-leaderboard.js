@@ -7,6 +7,7 @@ import { db, functions, isFirebaseConfigured } from './firebase.js';
 import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 import { playSound, selectSound } from './audio.js';
+import { assertIntegrityForRankedAction, isIntegrityTriggered } from './integrity.js';
 
 const MODE_LABELS = {
   base: 'Normal',
@@ -33,6 +34,9 @@ const RANK_3_MESSAGES = [
   'So close to greatness. One more run.',
 ];
 
+let activeRunId = null;
+let activeRunMode = null;
+
 function pickRandom(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
 }
@@ -57,23 +61,62 @@ function countBetterThan(entries, run, mode, excludeUid = null) {
   }).length;
 }
 
-function computeGlobalRank(entries, run, mode) {
-  return countBetterThan(entries, run, mode) + 1;
+function computeGlobalRank(entries, run, mode, excludeUid = null) {
+  return countBetterThan(entries, run, mode, excludeUid) + 1;
 }
 
 function compareScoreLocally(entries, mode, level, time, uid) {
   const run = { level, time, uid };
   const existing = entries.find((e) => e.uid === uid) || null;
-  const countBetter = countBetterThan(entries, run, mode);
+  const countBetter = countBetterThan(entries, run, mode, uid);
   const isGlobalPB = !existing || isBetter(run, existing, mode);
   const currentGlobalRank = isGlobalPB
-    ? computeGlobalRank(entries, run, mode)
-    : (existing ? computeGlobalRank(entries, existing, mode) : null);
+    ? computeGlobalRank(entries, run, mode, uid)
+    : (existing ? computeGlobalRank(entries, existing, mode, uid) : null);
   return { countBetter, isGlobalPB, currentGlobalRank };
 }
 
 export function getModeLabel(mode) {
   return MODE_LABELS[mode] || mode;
+}
+
+export function getActiveRunId() {
+  return activeRunId;
+}
+
+export function clearActiveRun() {
+  activeRunId = null;
+  activeRunMode = null;
+}
+
+/** Start a ranked session when a signed-in player begins a game. */
+export async function startOnlineRun(mode) {
+  clearActiveRun();
+  if (isIntegrityTriggered()) return null;
+  if (!isFirebaseConfigured || !isOnline() || !isSignedIn()) {
+    return null;
+  }
+
+  const uid = getCurrentUser()?.uid;
+  if (!uid) return null;
+
+  if (functions) {
+    try {
+      const fn = httpsCallable(functions, 'startRun');
+      const result = await withTimeout(fn({ mode }), 5000);
+      if (result.data?.runId) {
+        activeRunId = result.data.runId;
+        activeRunMode = mode;
+        return activeRunId;
+      }
+    } catch (err) {
+      console.warn('startRun unavailable — using Firestore rules path:', err);
+    }
+  }
+
+  activeRunId = `client_${uid}_${mode}`;
+  activeRunMode = mode;
+  return activeRunId;
 }
 
 async function fetchAllEntries(mode) {
@@ -102,7 +145,7 @@ async function submitScoreDirect(mode, level, time, uid) {
   });
 
   const updated = await fetchAllEntries(mode);
-  const globalRank = computeGlobalRank(updated, run, mode);
+  const globalRank = computeGlobalRank(updated, run, mode, uid);
   return { globalRank, isNewPB: true };
 }
 
@@ -112,56 +155,72 @@ export async function getScoreComparison(mode, level, time) {
   const uid = getCurrentUser()?.uid;
   if (!uid) return null;
 
-  const runLocalCompare = async () => {
+  const compareLocally = async () => {
     const entries = await fetchAllEntries(mode);
     return compareScoreLocally(entries, mode, level, time, uid);
   };
 
-  if (!functions) {
-    return runLocalCompare();
+  if (functions) {
+    try {
+      const fn = httpsCallable(functions, 'getScoreComparison');
+      const result = await withTimeout(fn({ mode, level, time }));
+      return result.data;
+    } catch (err) {
+      console.warn('Cloud compare unavailable, using Firestore read:', err);
+    }
   }
 
-  try {
-    const fn = httpsCallable(functions, 'getScoreComparison');
-    const result = await withTimeout(fn({ mode, level, time }));
-    return result.data;
-  } catch (err) {
-    console.warn('Cloud compare unavailable, using Firestore fallback:', err);
-    return runLocalCompare();
-  }
+  return compareLocally();
 }
 
 export async function submitScore(mode, level, time) {
-  if (!isFirebaseConfigured || !isOnline()) return null;
+  if (!isFirebaseConfigured || !isOnline() || !isSignedIn()) return null;
+
+  await assertIntegrityForRankedAction();
 
   const uid = getCurrentUser()?.uid;
   if (!uid) return null;
 
-  if (functions) {
+  if (!activeRunId || activeRunMode !== mode) {
+    console.warn('No active ranked session for this mode.');
+    return null;
+  }
+
+  const useFunctions = functions && !activeRunId.startsWith('client_');
+  if (useFunctions) {
     try {
-      const fn = httpsCallable(functions, 'submitScore');
-      const result = await withTimeout(fn({ mode, level, time }));
+      const fn = httpsCallable(functions, 'submitRun');
+      const result = await withTimeout(fn({ runId: activeRunId, level, time }), 15000);
+      clearActiveRun();
       return result.data;
     } catch (err) {
-      console.warn('Cloud submit unavailable, saving to Firestore directly:', err);
+      console.warn('submitRun unavailable, saving via Firestore rules:', err);
     }
   }
 
   try {
-    return await submitScoreDirect(mode, level, time, uid);
+    const result = await submitScoreDirect(mode, level, time, uid);
+    clearActiveRun();
+    return result;
   } catch (err) {
     console.warn('Direct score save failed:', err);
-    return null;
+    throw err;
   }
 }
 
 function describeOnlineError(err) {
   const code = err?.code || '';
   if (code === 'functions/not-found' || code === 'functions/unavailable') {
-    return 'Global ranking server is not set up yet (Firebase Blaze plan required).';
+    return 'Global ranking server unavailable — score saved locally.';
+  }
+  if (code === 'functions/internal') {
+    return 'Could not save global score right now — local scores saved.';
   }
   if (code === 'unauthenticated') {
     return 'Sign in to compare your score globally.';
+  }
+  if (code === 'failed-precondition') {
+    return 'Ranked submit unavailable — start a new game while signed in.';
   }
   if (err?.message?.includes('Failed to fetch') || code === 'auth/network-request-failed') {
     return 'Network blocked — try disabling ad blockers or use another browser.';
@@ -255,6 +314,7 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
   container.innerHTML = '<p class="online-death-hint">Checking global rank…</p>';
 
   try {
+    await assertIntegrityForRankedAction();
     const comparison = await getScoreComparison(mode, level, time);
     if (!comparison) {
       container.innerHTML = '<p class="online-death-hint">Could not load global scores.</p>';
@@ -264,16 +324,22 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
     const { countBetter, isGlobalPB, currentGlobalRank } = comparison;
 
     if (isGlobalPB) {
+      if (!activeRunId) {
+        container.innerHTML = '<p class="online-death-hint">Ranked submit requires starting the game while signed in. Local scores saved.</p>';
+        return;
+      }
       const submit = await submitScore(mode, level, time);
       const rank = submit?.globalRank ?? currentGlobalRank;
       fireConfetti();
       container.innerHTML = renderPersonalBestMessage(rank);
     } else {
+      clearActiveRun();
       const n = countBetter ?? 0;
       const people = n === 1 ? '1 person is' : `${n} people are`;
       container.innerHTML = `<p class="online-death-hint">${people} better than you</p>`;
     }
   } catch (err) {
+    clearActiveRun();
     container.innerHTML = `<p class="online-death-hint">${describeOnlineError(err)}</p>`;
     console.warn('Online score error:', err);
   }
@@ -388,4 +454,12 @@ export function initOnlineLeaderboard() {
   window.addEventListener('navigate:account', () => {
     window.dispatchEvent(new CustomEvent('menus:go-account'));
   });
+}
+
+if (!import.meta.env.PROD && typeof window !== 'undefined') {
+  window.__FIGGLE_DEV__ = {
+    ...(window.__FIGGLE_DEV__ || {}),
+    getActiveRunId,
+    clearActiveRun,
+  };
 }

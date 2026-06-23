@@ -12,9 +12,31 @@ service cloud.firestore {
         && request.resource.data.level <= 500
         && request.resource.data.time is number
         && request.resource.data.time >= 0
+        && request.resource.data.time <= 86400000
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() >= 1
         && request.resource.data.displayName.size() <= 20;
+    }
+
+    function existingEntry(mode, uid) {
+      return get(/databases/$(database)/documents/leaderboards/$(mode)/entries/$(uid));
+    }
+
+    function isScoreImprovement(mode, uid) {
+      let existing = existingEntry(mode, uid);
+      return !existing.exists
+        || request.resource.data.level > existing.data.level
+        || (request.resource.data.level == existing.data.level
+            && mode == 'timeAttack'
+            && request.resource.data.time > existing.data.time)
+        || (request.resource.data.level == existing.data.level
+            && mode != 'timeAttack'
+            && request.resource.data.time < existing.data.time);
+    }
+
+    function levelJumpOk(mode, uid) {
+      let existing = existingEntry(mode, uid);
+      return !existing.exists || request.resource.data.level <= existing.data.level + 5;
     }
 
     match /users/{userId} {
@@ -22,6 +44,10 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /runs/{runId} {
+      allow read, write: if false;
     }
 
     match /leaderboards/{mode}/entries/{userId} {
@@ -33,7 +59,9 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid == userId
         && validMode(mode)
-        && validLeaderboardEntry();
+        && validLeaderboardEntry()
+        && isScoreImprovement(mode, userId)
+        && levelJumpOk(mode, userId);
       allow delete: if request.auth != null
         && request.auth.uid == userId
         && validMode(mode);

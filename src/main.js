@@ -6,25 +6,19 @@ import { initGameControls, initConsole } from './game.js';
 
 import { initCredits } from './credits.js';
 
+import { initIntegrity } from './integrity.js';
 
-
-window.pressedKeys = {};
-
-
+const pressedKeys = {};
 
 document.addEventListener('keydown', (event) => {
-
-  window.pressedKeys[event.key] = true;
-
+  pressedKeys[event.key] = true;
 });
-
-
 
 document.addEventListener('keyup', (event) => {
-
-  window.pressedKeys[event.key] = false;
-
+  pressedKeys[event.key] = false;
 });
+
+window.pressedKeys = pressedKeys;
 
 
 
@@ -64,7 +58,9 @@ function startAppSession() {
 
   generateRandomMessage();
 
-  import('./sound-test.js');
+  if (!import.meta.env.PROD) {
+    import('./sound-test.js');
+  }
 
   import('./bootstrap-online.js').then(({ bootstrapOnlineServices }) => {
 
@@ -77,13 +73,13 @@ function startAppSession() {
 
 
 function init() {
+  initIntegrity();
 
   initScreens();
 
   initTitleScreen();
 
   initPlayGate(startAppSession);
-
 }
 
 
