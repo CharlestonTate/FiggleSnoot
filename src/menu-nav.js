@@ -61,15 +61,107 @@ export function createMenuNav(buttons, options = {}) {
   return { handleKey, reset, update, getIndex: () => index };
 }
 
-/** Main menu enter sounds (first = warf, last = dung, middle = select) */
-export function createMainMenuNav(buttons) {
-  return createMenuNav(buttons, {
-    onEnter(index) {
+/** Main menu — vertical list + optional account FAB at bottom */
+export function createMainMenuNav(buttons, fabButton = null) {
+  let index = 0;
+  let fabSelected = false;
+  const list = [...buttons];
+
+  function update() {
+    list.forEach((btn, i) => btn?.classList.toggle('selected', !fabSelected && i === index));
+    fabButton?.classList.toggle('selected', fabSelected);
+  }
+
+  function reset(newIndex = 0) {
+    index = newIndex;
+    fabSelected = false;
+    update();
+  }
+
+  function selectFab() {
+    fabSelected = true;
+    update();
+  }
+
+  function handleKey(event) {
+    const key = event.key;
+    const lower = key.toLowerCase();
+
+    if (fabSelected) {
+      if (key === 'ArrowUp' || lower === 'w') {
+        event.preventDefault();
+        fabSelected = false;
+        index = list.length - 1;
+        update();
+        playNextSound();
+        return true;
+      }
+      if (key === 'ArrowDown' || lower === 's') {
+        event.preventDefault();
+        fabSelected = false;
+        index = 0;
+        update();
+        playNextSound();
+        return true;
+      }
+      if (key === 'Enter' || key === ' ') {
+        event.preventDefault();
+        playSound(selectSound);
+        fabButton?.click();
+        return true;
+      }
+      return false;
+    }
+
+    if (key === 'ArrowUp' || lower === 'w') {
+      event.preventDefault();
+      if (index === 0 && fabButton) {
+        selectFab();
+      } else {
+        index = (index - 1 + list.length) % list.length;
+        update();
+      }
+      playNextSound();
+      return true;
+    }
+
+    if (key === 'ArrowDown' || lower === 's') {
+      event.preventDefault();
+      if (index === list.length - 1 && fabButton) {
+        selectFab();
+      } else {
+        index = (index + 1) % list.length;
+        update();
+      }
+      playNextSound();
+      return true;
+    }
+
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
       if (index === 0) playSound(warfSound);
-      else if (index === buttons.length - 1) playSound(dungSound);
+      else if (index === list.length - 1) playSound(dungSound);
       else playSound(selectSound);
-    },
+      list[index]?.click();
+      return true;
+    }
+
+    return false;
+  }
+
+  list.forEach((btn, i) => {
+    btn?.addEventListener('mouseenter', () => {
+      fabSelected = false;
+      index = i;
+      update();
+    });
   });
+
+  fabButton?.addEventListener('mouseenter', () => {
+    selectFab();
+  });
+
+  return { handleKey, reset, update, getIndex: () => index };
 }
 
 /** Death screen enter sounds */
@@ -171,6 +263,61 @@ export function createLeaderboardNav(buttons) {
   return { handleKey, reset, update };
 }
 
+/** Sign-out confirm — Yes / No side by side */
+export function createSignOutConfirmNav(buttons) {
+  let index = 0;
+  const list = buttons.filter(Boolean);
+
+  function update() {
+    list.forEach((btn, i) => btn?.classList.toggle('selected', i === index));
+  }
+
+  function reset(newIndex = 0) {
+    index = newIndex;
+    update();
+  }
+
+  function handleKey(event) {
+    const key = event.key;
+    const lower = key.toLowerCase();
+
+    if (key === 'ArrowLeft' || lower === 'a') {
+      event.preventDefault();
+      index = (index - 1 + list.length) % list.length;
+      update();
+      playNextSound();
+      return true;
+    }
+
+    if (key === 'ArrowRight' || lower === 'd') {
+      event.preventDefault();
+      index = (index + 1) % list.length;
+      update();
+      playNextSound();
+      return true;
+    }
+
+    if (key === 'Enter' || key === ' ') {
+      event.preventDefault();
+      if (list[index]?.id === 'account-signout-no') playSound(dungSound);
+      else playSound(selectSound);
+      list[index]?.click();
+      return true;
+    }
+
+    return false;
+  }
+
+  list.forEach((btn, i) => {
+    btn?.addEventListener('mouseenter', () => {
+      index = i;
+      update();
+    });
+  });
+
+  return { handleKey, reset, update };
+}
+
 /** Account screen — Sign In / Sign Up side-by-side, then Forgot, then Back */
 export function createAccountNav(getButtons) {
   let index = 0;
@@ -192,22 +339,35 @@ export function createAccountNav(getButtons) {
 
     const key = event.key;
     const lower = key.toLowerCase();
-    const authRow = buttons.length >= 4;
 
-    if ((key === 'ArrowLeft' || lower === 'a') && authRow && (index === 0 || index === 1)) {
-      event.preventDefault();
-      index = index === 0 ? 1 : 0;
-      update();
-      playNextSound();
-      return true;
+    function isInAuthRow(btn) {
+      return Boolean(btn?.closest('.account-auth-row'));
     }
 
-    if ((key === 'ArrowRight' || lower === 'd') && authRow && (index === 0 || index === 1)) {
-      event.preventDefault();
-      index = index === 0 ? 1 : 0;
-      update();
-      playNextSound();
-      return true;
+    if ((key === 'ArrowLeft' || lower === 'a') && isInAuthRow(buttons[index])) {
+      const authBtns = buttons.filter(isInAuthRow);
+      const pos = authBtns.indexOf(buttons[index]);
+      if (pos >= 0) {
+        event.preventDefault();
+        const next = authBtns[(pos - 1 + authBtns.length) % authBtns.length];
+        index = buttons.indexOf(next);
+        update();
+        playNextSound();
+        return true;
+      }
+    }
+
+    if ((key === 'ArrowRight' || lower === 'd') && isInAuthRow(buttons[index])) {
+      const authBtns = buttons.filter(isInAuthRow);
+      const pos = authBtns.indexOf(buttons[index]);
+      if (pos >= 0) {
+        event.preventDefault();
+        const next = authBtns[(pos + 1) % authBtns.length];
+        index = buttons.indexOf(next);
+        update();
+        playNextSound();
+        return true;
+      }
     }
 
     if (key === 'ArrowUp' || lower === 'w') {

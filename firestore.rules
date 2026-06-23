@@ -34,7 +34,9 @@ service cloud.firestore {
         && request.auth.uid == userId
         && validMode(mode)
         && validLeaderboardEntry();
-      allow delete: if false;
+      allow delete: if request.auth != null
+        && request.auth.uid == userId
+        && validMode(mode);
     }
   }
 }

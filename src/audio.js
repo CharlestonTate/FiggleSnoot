@@ -16,6 +16,7 @@ export const missionCompleteSound = new Audio('sounds/MISSIONCOMPREET.mp3');
 export const coinCollectSound = new Audio('sounds/POPTHING1.mp3');
 export const dyingSound = new Audio('sounds/BADWIGGLE.mp3');
 export const badWiggleSound = new Audio('sounds/BADWIGGLE.mp3');
+export const boomSmallSound = new Audio('sounds/BOOMSMALL.wav');
 export const warpWarpSound = new Audio('sounds/WARPWARP.mp3');
 
 export const onlineSound1 = new Audio('onlinesounds/january2016online3.mp3');

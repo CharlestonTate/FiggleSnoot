@@ -1,6 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import {
-  collection, doc, getDocs, query, orderBy, limit, setDoc, serverTimestamp,
+  collection, doc, getDoc, getDocs, query, orderBy, limit, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { db, functions, isFirebaseConfigured } from './firebase.js';
@@ -169,33 +169,45 @@ function describeOnlineError(err) {
 }
 
 export function fireConfetti() {
-  const duration = 3200;
-  const end = Date.now() + duration;
   const colors = ['#ff7eb3', '#457b9d', '#2a9d8f', '#FFE393', '#ffffff', '#ffb347'];
+  const zIndex = 10001;
 
   confetti({
-    particleCount: 150,
-    spread: 120,
-    origin: { x: 0.5, y: 0.5 },
-    startVelocity: 55,
-    gravity: 0.9,
-    scalar: 1.2,
+    particleCount: 140,
+    spread: 110,
+    origin: { x: 0.5, y: 0.42 },
+    startVelocity: 52,
+    gravity: 1.15,
+    scalar: 2.6,
+    ticks: 90,
+    zIndex,
     colors,
   });
 
-  const frame = () => {
+  setTimeout(() => {
     confetti({
-      particleCount: 20,
-      spread: 360,
-      origin: { x: 0.5, y: 0.5 },
-      startVelocity: 35,
+      particleCount: 70,
+      angle: 60,
+      spread: 60,
+      origin: { x: 0.05, y: 0.55 },
+      startVelocity: 48,
+      scalar: 2.2,
       ticks: 80,
-      scalar: 1.1,
+      zIndex,
       colors,
     });
-    if (Date.now() < end) requestAnimationFrame(frame);
-  };
-  frame();
+    confetti({
+      particleCount: 70,
+      angle: 120,
+      spread: 60,
+      origin: { x: 0.95, y: 0.55 },
+      startVelocity: 48,
+      scalar: 2.2,
+      ticks: 80,
+      zIndex,
+      colors,
+    });
+  }, 120);
 }
 
 function renderPersonalBestMessage(rank) {
@@ -293,9 +305,8 @@ export async function fetchTopScores(mode, topN = 25) {
   }));
 }
 
-export function renderGlobalScores(container, scores, mode) {
+export function renderGlobalScores(container, scores, mode, { showAll = false } = {}) {
   if (!container) return;
-  container.innerHTML = '';
 
   if (!isFirebaseConfigured) {
     container.innerHTML = '<div class="no-scores">Set Firebase env vars to enable global leaderboard.</div>';
@@ -307,7 +318,10 @@ export function renderGlobalScores(container, scores, mode) {
     return;
   }
 
-  scores.forEach((score) => {
+  container.innerHTML = '';
+  const displayScores = showAll ? scores : scores.slice(0, 5);
+
+  displayScores.forEach((score) => {
     const entry = document.createElement('div');
     entry.classList.add('score-entry');
     const label = getModeLabel(mode);
@@ -319,6 +333,48 @@ export function renderGlobalScores(container, scores, mode) {
     `;
     container.appendChild(entry);
   });
+
+  const seeAllBtn = document.getElementById('global-see-all-button');
+  if (seeAllBtn) {
+    const hasMore = scores.length > 5;
+    seeAllBtn.classList.toggle('hidden', !hasMore);
+    seeAllBtn.textContent = showAll ? 'Show Top 5' : 'See All';
+  }
+}
+
+export async function fetchUserGlobalEntries(uid) {
+  if (!db || !uid) return {};
+  const modes = ['base', 'timeAttack', 'blackout'];
+  const entries = {};
+  await Promise.all(modes.map(async (mode) => {
+    try {
+      const snap = await getDoc(doc(db, 'leaderboards', mode, 'entries', uid));
+      entries[mode] = snap.exists() ? snap.data() : null;
+    } catch {
+      entries[mode] = null;
+    }
+  }));
+  return entries;
+}
+
+export function renderOnlineStatsHtml(entries) {
+  const rows = Object.entries(MODE_LABELS).map(([mode, label]) => {
+    const entry = entries[mode];
+    const best = entry ? `Lv ${entry.level}` : '—';
+    return `
+      <div class="account-stat-row">
+        <span class="account-stat-mode">${label} (online)</span>
+        <span class="account-stat-val">Best: ${best}</span>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="account-stats-panel account-online-panel">
+      <h2 class="account-stats-title">Global Bests</h2>
+      ${rows}
+    </div>
+  `;
 }
 
 export function initOnlineLeaderboard() {

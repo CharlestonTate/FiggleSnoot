@@ -2660,6 +2660,85 @@ input:checked + .toggle-slider:before {
   display: none;
 }
 
+.account-hub-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  margin: 12px auto;
+}
+
+.account-hub-actions.hidden {
+  display: none;
+}
+
+.account-hub-actions .menu-button {
+  width: 100%;
+}
+
+.account-forgot-hint {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0 auto 12px;
+  max-width: 320px;
+}
+
+.account-signout-prompt {
+  font-size: 1.1rem;
+  margin: 20px auto 24px;
+  max-width: 340px;
+  line-height: 1.5;
+}
+
+#global-see-all-button {
+  margin: 8px auto 12px;
+  max-width: 220px;
+}
+
+#global-see-all-button.hidden {
+  display: none;
+}
+
+/* Global intro — first visit COMING SOON */
+#global-intro-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.global-intro-header {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  cursor: default;
+  user-select: none;
+}
+
+.global-intro-cat {
+  width: 200px;
+  height: auto;
+  margin: 20px 0;
+  transition: transform 0.45s ease-out, opacity 0.45s ease-out, filter 0.45s ease-out;
+}
+
+.global-intro-cat.cat-explode {
+  transform: scale(3);
+  opacity: 0;
+  filter: blur(12px) brightness(2);
+}
+
+#global-intro-screen.global-intro-flash {
+  animation: global-intro-flash 0.35s ease-out;
+}
+
+@keyframes global-intro-flash {
+  0% { background-color: transparent; }
+  40% { background-color: rgba(255, 180, 80, 0.85); }
+  100% { background-color: transparent; }
+}
+
 /* Global leaderboard tabs */
 .global-mode-tabs {
   flex-direction: row !important;
@@ -2743,5 +2822,165 @@ input:checked + .toggle-slider:before {
   width: 100%;
   max-width: 300px;
   box-sizing: border-box;
+}
+
+/* Account FAB — circular button at bottom of menu */
+.account-fab {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(145deg, #ff7eb3, #ff4d8d);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-fab:hover,
+.account-fab.selected {
+  transform: translateX(-50%) scale(1.08);
+  box-shadow: 0 6px 28px rgba(255, 126, 179, 0.55);
+  outline: 3px solid #FFE393;
+}
+
+.account-fab.hidden {
+  display: none;
+}
+
+/* Account screen layout */
+.account-screen-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.account-stats-container {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.account-stats-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: 12px auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.account-stats-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: #FFE393;
+}
+
+.account-stat-summary {
+  font-size: 0.95rem;
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.account-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+
+.account-stat-mode {
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.account-stat-val {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.account-stat-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 12px 0 0;
+  line-height: 1.4;
+}
+
+.account-greeting {
+  margin: 8px 0 16px;
+}
+
+.account-online-stats {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.account-online-stats.hidden {
+  display: none;
+}
+
+.account-online-panel {
+  margin-top: 0;
+}
+
+.account-danger-btn {
+  background: rgba(180, 40, 40, 0.85) !important;
+  font-size: 0.95rem !important;
+  margin-top: 8px !important;
+}
+
+.account-danger-btn.selected {
+  background: rgba(220, 60, 60, 0.95) !important;
+}
+
+#account-signed-in .menu-button {
+  width: 100%;
+  max-width: 320px;
+}
+
+/* Loading spinner — global leaderboard */
+.loading-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 14px;
+}
+
+.loading-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #FFE393;
+  border-radius: 50%;
+  animation: figgle-spin 0.75s linear infinite;
+}
+
+.loading-spinner-text {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+@keyframes figgle-spin {
+  to { transform: rotate(360deg); }
 }
 

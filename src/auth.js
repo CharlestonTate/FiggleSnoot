@@ -4,8 +4,11 @@ import {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase.js';
 let currentUser = null;
 let currentDisplayName = null;
@@ -99,18 +102,49 @@ export async function resetPassword(email) {
   await sendPasswordResetEmail(auth, email.trim());
 }
 
+const LEADERBOARD_MODES = ['base', 'timeAttack', 'blackout'];
+
+async function deleteUserFirestoreData(uid) {
+  if (!db || !uid) return;
+  await Promise.all(LEADERBOARD_MODES.map((mode) =>
+    deleteDoc(doc(db, 'leaderboards', mode, 'entries', uid)).catch(() => {})));
+  await deleteDoc(doc(db, 'users', uid)).catch(() => {});
+}
+
+export async function deleteMyGlobalScores() {
+  const uid = currentUser?.uid;
+  if (!auth || !db || !uid) throw new Error('Sign in to delete global scores.');
+  await Promise.all(LEADERBOARD_MODES.map((mode) =>
+    deleteDoc(doc(db, 'leaderboards', mode, 'entries', uid))));
+}
+
+export async function deleteAccount(password) {
+  if (!auth || !db) throw new Error('Firebase is not configured.');
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in.');
+  if (!password) throw new Error('Enter your password to delete your account.');
+
+  const cred = EmailAuthProvider.credential(user.email, password);
+  await reauthenticateWithCredential(user, cred);
+  const uid = user.uid;
+  await deleteUserFirestoreData(uid);
+  await deleteUser(user);
+  currentUser = null;
+  currentDisplayName = null;
+}
+
 export function updateAccountUI() {
-  const signedOut = document.getElementById('account-signed-out');
+  const signedOutHub = document.getElementById('account-signed-out-hub');
   const signedIn = document.getElementById('account-signed-in');
   const nameEl = document.getElementById('account-display-name');
-  if (!signedOut || !signedIn) return;
+  if (!signedOutHub || !signedIn) return;
 
   if (currentUser) {
-    signedOut.classList.add('hidden');
+    signedOutHub.classList.add('hidden');
     signedIn.classList.remove('hidden');
     if (nameEl) nameEl.textContent = currentDisplayName || currentUser.email;
   } else {
-    signedOut.classList.remove('hidden');
+    signedOutHub.classList.remove('hidden');
     signedIn.classList.add('hidden');
   }
 }

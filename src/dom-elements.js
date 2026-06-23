@@ -21,6 +21,8 @@ export const blackoutScoresScreen = document.getElementById('blackout-scores-scr
 export const bombConfirmationPopup = document.getElementById('bomb-confirmation-popup');
 export const consoleContainer = document.getElementById('console-container');
 
+export const accountFab = document.getElementById('account-fab');
+
 export const menuButtons = document.querySelectorAll('#menu-screen .menu-button');
 export const gameModeButtons = document.querySelectorAll('#game-mode-screen .menu-button');
 export const deathButtons = [restartButton, menuButton];

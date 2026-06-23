@@ -2,11 +2,11 @@ import {
 
   playButton, restartButton, menuButton, menuButtons, gameModeButtons, deathButtons,
 
-  consoleContainer, bombConfirmationPopup,
+  consoleContainer, bombConfirmationPopup, accountFab,
 
 } from './dom-elements.js';
 
-import { switchScreens, isScreenVisible } from './screens.js';
+import { switchScreens, isScreenVisible, getVisibleScreen, showScreen } from './screens.js';
 
 import {
 
@@ -46,11 +46,28 @@ import {
 
   initAccountScreen, onAccountScreenOpen, handleAccountNavigation,
 
+  handleAccountSignInNavigation, handleAccountSignUpNavigation,
+
+  handleAccountForgotNavigation, handleAccountSignOutNavigation,
+
 } from './account-screen.js';
 
 
 
-const mainMenuNav = createMainMenuNav(menuButtons);
+const mainMenuNav = createMainMenuNav([...menuButtons], accountFab);
+
+function setAccountFabVisible(visible) {
+  accountFab?.classList.toggle('hidden', !visible);
+}
+
+function enterMenu() {
+  setAccountFabVisible(true);
+  mainMenuNav.reset();
+}
+
+function leaveMenu() {
+  setAccountFabVisible(false);
+}
 
 const gameModeNav = createMenuNav(gameModeButtons);
 
@@ -110,6 +127,8 @@ export function initAppMenus() {
 
   document.getElementById('play-game-button').addEventListener('click', () => {
 
+    leaveMenu();
+
     switchScreens('menu', 'gameMode');
 
     gameModeNav.reset();
@@ -162,7 +181,7 @@ export function initAppMenus() {
 
     updateCoinDisplay();
 
-    mainMenuNav.reset();
+    enterMenu();
 
   });
 
@@ -172,9 +191,9 @@ export function initAppMenus() {
 
     playSound(dungSound);
 
-    switchScreens('menu', 'title');
+    leaveMenu();
 
-    mainMenuNav.reset();
+    switchScreens('menu', 'title');
 
   });
 
@@ -184,6 +203,8 @@ export function initAppMenus() {
 
     playSound(warfSound);
 
+    leaveMenu();
+
     switchScreens('menu', 'settings');
 
     resetSettingsNav();
@@ -192,15 +213,21 @@ export function initAppMenus() {
 
 
 
-  document.getElementById('account-button').addEventListener('click', () => {
+  const openAccountFromMenu = () => {
 
     playSound(selectSound);
+
+    leaveMenu();
 
     switchScreens('menu', 'account');
 
     onAccountScreenOpen();
 
-  });
+  };
+
+
+
+  accountFab?.addEventListener('click', openAccountFromMenu);
 
 
 
@@ -210,7 +237,25 @@ export function initAppMenus() {
 
     switchScreens('account', 'menu');
 
-    mainMenuNav.reset();
+    enterMenu();
+
+  });
+
+
+
+  window.addEventListener('menus:open-account', () => {
+
+    playSound(selectSound);
+
+    leaveMenu();
+
+    const from = getVisibleScreen();
+
+    if (from && from !== 'account') switchScreens(from, 'account');
+
+    else showScreen('account');
+
+    onAccountScreenOpen();
 
   });
 
@@ -219,6 +264,8 @@ export function initAppMenus() {
   window.addEventListener('menus:go-account', () => {
 
     playSound(dungSound);
+
+    leaveMenu();
 
     switchScreens('gameOver', 'account');
 
@@ -240,7 +287,7 @@ export function initAppMenus() {
 
     updateCoinDisplay();
 
-    mainMenuNav.reset();
+    enterMenu();
 
   };
 
@@ -264,11 +311,11 @@ export function initAppMenus() {
 
 
 
-  initLeaderboard(() => mainMenuNav.reset());
+  initLeaderboard(enterMenu, leaveMenu);
 
 
 
-  window.addEventListener('menu:reset', () => mainMenuNav.reset());
+  window.addEventListener('menu:reset', () => enterMenu());
 
   window.addEventListener('leaderboard:reset', () => leaderboardNav.reset());
 
@@ -294,7 +341,7 @@ function goToMenu() {
 
   updateCoinDisplay();
 
-  mainMenuNav.reset();
+  enterMenu();
 
 }
 
@@ -339,6 +386,14 @@ function handleKeyboardNavigation(event) {
   if (isScreenVisible('settings')) { handleSettingsNavigation(event); return; }
 
   if (isScreenVisible('account')) { handleAccountNavigation(event); return; }
+
+  if (isScreenVisible('accountSignIn')) { handleAccountSignInNavigation(event); return; }
+
+  if (isScreenVisible('accountSignUp')) { handleAccountSignUpNavigation(event); return; }
+
+  if (isScreenVisible('accountForgot')) { handleAccountForgotNavigation(event); return; }
+
+  if (isScreenVisible('accountSignOut')) { handleAccountSignOutNavigation(event); return; }
 
   if (isScreenVisible('leaderboard')) { leaderboardNav.handleKey(event); return; }
 

@@ -40,11 +40,12 @@
       <button id="play-game-button" class="menu-button selected">Play</button>
       <button id="leaderboard-button" class="menu-button">Leaderboard</button>
       <button id="settings-button" class="menu-button">Settings</button>
-      <button id="account-button" class="menu-button">Account</button>
       <button id="credits-button" class="menu-button">Credits</button>
       <button id="back-button" class="menu-button">Back</button>
     </div>
   </div>
+
+  <button type="button" id="account-fab" class="account-fab hidden" title="Account" aria-label="Account">👤</button>
 
   <div id="game-mode-screen" class="screen hidden">
     <h1>Select Game Mode</h1>
@@ -80,6 +81,11 @@
     </div>
   </div>
 
+  <div id="global-intro-screen" class="screen hidden">
+    <h1 id="global-intro-header" class="global-intro-header">COMING SOON</h1>
+    <img id="global-intro-cat" class="global-intro-cat" src="img/cat.gif" alt="Dancing cat">
+  </div>
+
   <div id="global-leaderboard-screen" class="screen hidden">
     <h1>Global Leaderboard</h1>
     <div class="menu-buttons global-mode-tabs">
@@ -89,6 +95,7 @@
     </div>
     <div id="global-scores-container" class="scores-container"></div>
     <p id="global-scores-status" class="global-scores-status"></p>
+    <button type="button" id="global-see-all-button" class="menu-button hidden">See All</button>
     <button id="back-from-global-button" class="menu-button selected">Back</button>
   </div>
 
@@ -153,24 +160,70 @@
   </div>
 
   <div id="account-screen" class="screen hidden">
-    <h1>Account</h1>
-    <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
-    <p id="account-error" class="account-error hidden"></p>
-    <div id="account-signed-out" class="account-form">
-      <input type="text" id="account-displayname-input" class="account-input" placeholder="Display name (signup)" maxlength="20" autocomplete="nickname">
-      <input type="email" id="account-email" class="account-input" placeholder="Email" autocomplete="email">
-      <input type="password" id="account-password" class="account-input" placeholder="Password" autocomplete="current-password">
-      <div class="account-auth-row">
-        <button type="button" id="account-signin-button" class="menu-button selected">Sign In</button>
-        <button type="button" id="account-signup-button" class="menu-button">Sign Up</button>
+    <div class="account-screen-inner">
+      <h1>Account</h1>
+      <div id="account-stats-container" class="account-stats-container"></div>
+      <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
+      <p id="account-error" class="account-error hidden"></p>
+      <div id="account-signed-out-hub" class="account-hub-actions">
+        <button type="button" id="account-go-signin-button" class="menu-button selected">Sign In</button>
+        <button type="button" id="account-go-signup-button" class="menu-button">Sign Up</button>
       </div>
-      <button type="button" id="account-reset-password-button" class="menu-button account-link-btn">Forgot Password?</button>
+      <div id="account-signed-in" class="account-signed-in hidden">
+        <p class="account-greeting">Playing as <strong id="account-display-name"></strong></p>
+        <div id="account-online-stats" class="account-online-stats hidden"></div>
+        <button type="button" id="account-signout-button" class="menu-button">Sign Out</button>
+        <button type="button" id="account-delete-scores-button" class="menu-button account-danger-btn">Delete Global Scores</button>
+        <button type="button" id="account-delete-account-button" class="menu-button account-danger-btn">Delete Account</button>
+      </div>
+      <button type="button" id="account-back-button" class="menu-button">Back</button>
     </div>
-    <div id="account-signed-in" class="account-signed-in hidden">
-      <p>Playing as <strong id="account-display-name"></strong></p>
-      <button type="button" id="account-signout-button" class="menu-button">Sign Out</button>
+  </div>
+
+  <div id="account-signin-screen" class="screen hidden">
+    <div class="account-screen-inner">
+      <h1>Sign In</h1>
+      <p id="account-signin-error" class="account-error hidden"></p>
+      <input type="email" id="signin-email" class="account-input" placeholder="Email" autocomplete="email">
+      <input type="password" id="signin-password" class="account-input" placeholder="Password" autocomplete="current-password">
+      <button type="button" id="account-signin-submit" class="menu-button selected">Sign In</button>
+      <button type="button" id="account-go-forgot-button" class="menu-button account-link-btn">Forgot Password?</button>
+      <button type="button" id="account-signin-back" class="menu-button">Back</button>
     </div>
-    <button type="button" id="account-back-button" class="menu-button">Back</button>
+  </div>
+
+  <div id="account-signup-screen" class="screen hidden">
+    <div class="account-screen-inner">
+      <h1>Sign Up</h1>
+      <p id="account-signup-error" class="account-error hidden"></p>
+      <input type="text" id="signup-displayname" class="account-input" placeholder="Display name" maxlength="20" autocomplete="nickname">
+      <input type="email" id="signup-email" class="account-input" placeholder="Email" autocomplete="email">
+      <input type="password" id="signup-password" class="account-input" placeholder="Password" autocomplete="new-password">
+      <button type="button" id="account-signup-submit" class="menu-button selected">Sign Up</button>
+      <button type="button" id="account-signup-back" class="menu-button">Back</button>
+    </div>
+  </div>
+
+  <div id="account-forgot-screen" class="screen hidden">
+    <div class="account-screen-inner">
+      <h1>Forgot Password</h1>
+      <p id="account-forgot-error" class="account-error hidden"></p>
+      <p class="account-forgot-hint">Enter your email and we'll send a reset link.</p>
+      <input type="email" id="forgot-email" class="account-input" placeholder="Email" autocomplete="email">
+      <button type="button" id="account-forgot-submit" class="menu-button selected">Send Reset Email</button>
+      <button type="button" id="account-forgot-back" class="menu-button">Back</button>
+    </div>
+  </div>
+
+  <div id="account-signout-screen" class="screen hidden">
+    <div class="account-screen-inner">
+      <h1>Sign Out</h1>
+      <p class="account-signout-prompt">Do you want to sign out of <strong id="signout-username"></strong>?</p>
+      <div class="account-auth-row">
+        <button type="button" id="account-signout-yes" class="menu-button selected">Yes</button>
+        <button type="button" id="account-signout-no" class="menu-button">No</button>
+      </div>
+    </div>
   </div>
 
   <div id="game-screen" class="screen hidden">

@@ -13,10 +13,39 @@ import {
 } from './audio.js';
 import { updateCoinDisplay } from './game.js';
 import { soundToggle } from './dom-elements.js';
+import { hasSeenOnlineMode, playGlobalIntro } from './global-intro.js';
+import { createMenuNav } from './menu-nav.js';
 
 let currentGlobalMusic = null;
 let activeGlobalMode = 'base';
 let currentClearingContainer = null;
+let cachedGlobalScores = [];
+let globalShowAll = false;
+let globalLeaderboardNav = null;
+
+const globalTabs = [
+  document.getElementById('global-normal-tab'),
+  document.getElementById('global-time-attack-tab'),
+  document.getElementById('global-blackout-tab'),
+];
+const globalSeeAllButton = document.getElementById('global-see-all-button');
+const globalBackButton = document.getElementById('back-from-global-button');
+
+function getGlobalNavButtons() {
+  const buttons = [...globalTabs.filter(Boolean)];
+  if (globalSeeAllButton && !globalSeeAllButton.classList.contains('hidden')) {
+    buttons.push(globalSeeAllButton);
+  }
+  if (globalBackButton) buttons.push(globalBackButton);
+  return buttons;
+}
+
+function refreshGlobalNav(preferBack = true) {
+  const buttons = getGlobalNavButtons();
+  globalLeaderboardNav = createMenuNav(buttons);
+  globalLeaderboardNav.reset(preferBack ? buttons.length - 1 : 0);
+  return globalLeaderboardNav;
+}
 
 const leaderboardScreens = {
   normal: {
@@ -36,11 +65,11 @@ const leaderboardScreens = {
   },
 };
 
-export function initLeaderboard(onMenuReset) {
+export function initLeaderboard(onMenuEnter, onMenuLeave) {
   document.getElementById('leaderboard-button').addEventListener('click', () => {
     playSound(selectSound);
+    onMenuLeave?.();
     switchScreens('menu', 'leaderboard');
-    onMenuReset?.();
     window.dispatchEvent(new CustomEvent('leaderboard:reset'));
   });
 
@@ -52,23 +81,21 @@ export function initLeaderboard(onMenuReset) {
 
   globalLeaderboardButton.addEventListener('click', () => {
     playSound(selectSound);
-    switchScreens('leaderboard', 'globalLeaderboard');
-    startGlobalLeaderboardMusic();
-    loadGlobalLeaderboard(activeGlobalMode);
+    openGlobalLeaderboard('leaderboard');
   });
 
   backFromLeaderboardButton.addEventListener('click', () => {
     playSound(dungSound);
     switchScreens('leaderboard', 'menu');
     updateCoinDisplay();
-    onMenuReset?.();
+    onMenuEnter?.();
   });
 
   backFromPersonalButton.addEventListener('click', () => {
     playSound(dungSound);
     switchScreens('personalLeaderboard', 'menu');
     updateCoinDisplay();
-    onMenuReset?.();
+    onMenuEnter?.();
   });
 
   backFromGlobalButton.addEventListener('click', () => {
@@ -125,6 +152,44 @@ export function initLeaderboard(onMenuReset) {
       loadGlobalLeaderboard(activeGlobalMode);
     });
   });
+
+  globalSeeAllButton?.addEventListener('click', () => {
+    playSound(selectSound);
+    globalShowAll = !globalShowAll;
+    renderCachedGlobalScores();
+  });
+}
+
+function openGlobalLeaderboard(fromScreen) {
+  const enterBoard = () => {
+    switchScreens('globalIntro', 'globalLeaderboard');
+    startGlobalLeaderboardMusic();
+    loadGlobalLeaderboard(activeGlobalMode);
+  };
+
+  if (!hasSeenOnlineMode()) {
+    playGlobalIntro(fromScreen, enterBoard);
+    return;
+  }
+
+  switchScreens(fromScreen, 'globalLeaderboard');
+  startGlobalLeaderboardMusic();
+  loadGlobalLeaderboard(activeGlobalMode);
+}
+
+function renderCachedGlobalScores() {
+  const container = document.getElementById('global-scores-container');
+  if (!container) return;
+
+  import('./bootstrap-online.js').then(async ({ bootstrapOnlineServices, getOnlineModule }) => {
+    await bootstrapOnlineServices();
+    const online = getOnlineModule();
+    if (!online || !cachedGlobalScores.length) return;
+    online.renderGlobalScores(container, cachedGlobalScores, activeGlobalMode, {
+      showAll: globalShowAll,
+    });
+    refreshGlobalNav(true);
+  });
 }
 
 export function getCurrentLeaderboardScreen() {
@@ -153,11 +218,8 @@ export function handleGameModeScoresNavigation(event) {
 }
 
 export function handleGlobalLeaderboardNavigation(event) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    playSound(dungSound);
-    backFromGlobalButton.click();
-  }
+  if (!globalLeaderboardNav) refreshGlobalNav(true);
+  globalLeaderboardNav?.handleKey(event);
 }
 
 export function showBombConfirmation(container) {
@@ -350,14 +412,23 @@ async function loadGlobalLeaderboard(mode) {
   const status = document.getElementById('global-scores-status');
   if (!container) return;
 
+  globalShowAll = false;
+
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     if (status) status.textContent = 'Offline — connect to view global scores.';
     container.innerHTML = '<div class="no-scores">Playing local only. Global board needs internet.</div>';
+    globalSeeAllButton?.classList.add('hidden');
     return;
   }
 
-  if (status) status.textContent = 'Loading…';
-  container.innerHTML = '';
+  if (status) status.textContent = '';
+  container.innerHTML = `
+    <div class="loading-spinner-wrap">
+      <div class="loading-spinner" role="status" aria-label="Loading"></div>
+      <p class="loading-spinner-text">Loading scores…</p>
+    </div>
+  `;
+  globalSeeAllButton?.classList.add('hidden');
 
   try {
     const { bootstrapOnlineServices, getOnlineModule } = await import('./bootstrap-online.js');
@@ -365,12 +436,14 @@ async function loadGlobalLeaderboard(mode) {
     const online = getOnlineModule();
     if (!online) throw new Error('Online module unavailable');
 
-    const scores = await online.fetchTopScores(mode);
-    online.renderGlobalScores(container, scores, mode);
+    cachedGlobalScores = await online.fetchTopScores(mode);
+    online.renderGlobalScores(container, cachedGlobalScores, mode, { showAll: false });
+    refreshGlobalNav(true);
     if (status) status.textContent = '';
   } catch (err) {
     console.warn('Global leaderboard load failed:', err);
     if (status) status.textContent = 'Could not load leaderboard.';
     container.innerHTML = '<div class="no-scores">Offline or unavailable — try again later.</div>';
+    globalSeeAllButton?.classList.add('hidden');
   }
 }
