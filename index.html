@@ -211,7 +211,7 @@
       <h1>Sign Up</h1>
       <p id="account-signup-error" class="account-error hidden"></p>
       <div class="account-form">
-        <input type="text" id="signup-displayname" class="account-input" placeholder="Display name" maxlength="20" autocomplete="nickname">
+        <input type="text" id="signup-displayname" class="account-input" placeholder="Display name" maxlength="20" autocomplete="nickname" autocapitalize="off" spellcheck="false" pattern="[A-Za-z0-9]+" title="Letters and numbers only, no spaces">
         <input type="email" id="signup-email" class="account-input" placeholder="Email" autocomplete="email">
         <input type="password" id="signup-password" class="account-input" placeholder="Password" autocomplete="new-password">
         <button type="button" id="account-signup-button" class="menu-button selected">Sign Up</button>

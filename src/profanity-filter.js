@@ -3,6 +3,8 @@
  */
 
 const PROFANITY_ERROR = 'That contains inappropriate language.';
+const NAME_SPACE_ERROR = 'Display names cannot contain spaces.';
+const NAME_CHARS_ERROR = 'Display names can only use letters and numbers.';
 
 const BLOCKED_TERMS = [
   'Anus', 'Arse', 'Arsehole', 'Ass', 'Ass-hat', 'Ass-jabber', 'Ass-pirate', 'Assbag',
@@ -87,11 +89,10 @@ function textMatchesTerm(text, term) {
 
   if (tokens.includes(term) || compact === term) return true;
 
-  if (term.length >= 5) {
-    if (compact.includes(term)) return true;
-    if (tokens.some((token) => token.includes(term))) return true;
-    return false;
-  }
+  // Spaced or symbol-separated evasions: "fuc k", "f.u.c.k", "f-u-c-k"
+  if (term.length >= 4 && compact.includes(term)) return true;
+
+  if (term.length >= 5 && tokens.some((token) => token.includes(term))) return true;
 
   if (term.length === 4) {
     return tokens.some((token) => token.length >= 4 && token.includes(term));
@@ -100,13 +101,31 @@ function textMatchesTerm(text, term) {
   return false;
 }
 
+/** Stricter matching for display names (single token, no spaces). */
+function nameMatchesTerm(name, term) {
+  if (!term) return false;
+  const compact = compactText(name);
+  if (!compact) return false;
+  if (compact === term) return true;
+  if (term.length >= 3 && compact.includes(term)) return true;
+  return false;
+}
+
+export function hasInvalidDisplayNameFormat(name) {
+  const value = String(name ?? '');
+  if (/\s/.test(value)) return 'space';
+  if (value && !/^[a-zA-Z0-9]+$/.test(value)) return 'chars';
+  return null;
+}
+
 export function containsProfanity(text) {
   if (!text) return false;
   return NORMALIZED_TERMS.some((term) => textMatchesTerm(text, term));
 }
 
 export function isDisplayNameProfane(name) {
-  return containsProfanity(name);
+  if (!name) return false;
+  return NORMALIZED_TERMS.some((term) => nameMatchesTerm(name, term));
 }
 
 export function isEmailProfane(email) {
@@ -119,7 +138,15 @@ export function isEmailProfane(email) {
 }
 
 export function assertCleanDisplayName(name) {
-  if (isDisplayNameProfane(name)) {
+  const trimmed = String(name ?? '').trim();
+  const formatIssue = hasInvalidDisplayNameFormat(trimmed);
+  if (formatIssue === 'space') {
+    throw new Error(NAME_SPACE_ERROR);
+  }
+  if (formatIssue === 'chars') {
+    throw new Error(NAME_CHARS_ERROR);
+  }
+  if (isDisplayNameProfane(trimmed)) {
     throw new Error(PROFANITY_ERROR);
   }
 }
@@ -137,7 +164,16 @@ export function attachProfanityInputGuard(inputEl, { mode = 'name' } = {}) {
   let lastClean = inputEl.value || '';
 
   inputEl.addEventListener('input', () => {
-    const value = inputEl.value;
+    let value = inputEl.value;
+
+    if (mode === 'name') {
+      const stripped = value.replace(/\s/g, '').replace(/[^a-zA-Z0-9]/g, '');
+      if (stripped !== value) {
+        value = stripped;
+        inputEl.value = value;
+      }
+    }
+
     const profane = mode === 'email' ? isEmailProfane(value) : isDisplayNameProfane(value);
     if (profane) {
       inputEl.value = lastClean;
