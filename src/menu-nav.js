@@ -263,61 +263,6 @@ export function createLeaderboardNav(buttons) {
   return { handleKey, reset, update };
 }
 
-/** Sign-out confirm — Yes / No side by side */
-export function createSignOutConfirmNav(buttons) {
-  let index = 0;
-  const list = buttons.filter(Boolean);
-
-  function update() {
-    list.forEach((btn, i) => btn?.classList.toggle('selected', i === index));
-  }
-
-  function reset(newIndex = 0) {
-    index = newIndex;
-    update();
-  }
-
-  function handleKey(event) {
-    const key = event.key;
-    const lower = key.toLowerCase();
-
-    if (key === 'ArrowLeft' || lower === 'a') {
-      event.preventDefault();
-      index = (index - 1 + list.length) % list.length;
-      update();
-      playNextSound();
-      return true;
-    }
-
-    if (key === 'ArrowRight' || lower === 'd') {
-      event.preventDefault();
-      index = (index + 1) % list.length;
-      update();
-      playNextSound();
-      return true;
-    }
-
-    if (key === 'Enter' || key === ' ') {
-      event.preventDefault();
-      if (list[index]?.id === 'account-signout-no') playSound(dungSound);
-      else playSound(selectSound);
-      list[index]?.click();
-      return true;
-    }
-
-    return false;
-  }
-
-  list.forEach((btn, i) => {
-    btn?.addEventListener('mouseenter', () => {
-      index = i;
-      update();
-    });
-  });
-
-  return { handleKey, reset, update };
-}
-
 /** Account screen — Sign In / Sign Up side-by-side, then Forgot, then Back */
 export function createAccountNav(getButtons) {
   let index = 0;

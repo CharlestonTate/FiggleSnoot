@@ -134,17 +134,17 @@ export async function deleteAccount(password) {
 }
 
 export function updateAccountUI() {
-  const signedOutHub = document.getElementById('account-signed-out-hub');
+  const guestActions = document.getElementById('account-guest-actions');
   const signedIn = document.getElementById('account-signed-in');
   const nameEl = document.getElementById('account-display-name');
-  if (!signedOutHub || !signedIn) return;
+  if (!guestActions || !signedIn) return;
 
   if (currentUser) {
-    signedOutHub.classList.add('hidden');
+    guestActions.classList.add('hidden');
     signedIn.classList.remove('hidden');
     if (nameEl) nameEl.textContent = currentDisplayName || currentUser.email;
   } else {
-    signedOutHub.classList.remove('hidden');
+    guestActions.classList.remove('hidden');
     signedIn.classList.add('hidden');
   }
 }

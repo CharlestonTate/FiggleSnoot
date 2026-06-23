@@ -9,43 +9,18 @@ import {
 } from './dom-elements.js';
 import { switchScreens, hideScreen, showScreen } from './screens.js';
 import {
-  playSound, selectSound, dungSound, badWiggleSound,
+  playSound, selectSound, dungSound, badWiggleSound, boomSmallSound,
 } from './audio.js';
 import { updateCoinDisplay } from './game.js';
 import { soundToggle } from './dom-elements.js';
-import { hasSeenOnlineMode, playGlobalIntro } from './global-intro.js';
-import { createMenuNav } from './menu-nav.js';
 
 let currentGlobalMusic = null;
 let activeGlobalMode = 'base';
 let currentClearingContainer = null;
-let cachedGlobalScores = [];
-let globalShowAll = false;
-let globalLeaderboardNav = null;
+let globalIntroTimer = null;
+let globalIntroResolve = null;
 
-const globalTabs = [
-  document.getElementById('global-normal-tab'),
-  document.getElementById('global-time-attack-tab'),
-  document.getElementById('global-blackout-tab'),
-];
-const globalSeeAllButton = document.getElementById('global-see-all-button');
-const globalBackButton = document.getElementById('back-from-global-button');
-
-function getGlobalNavButtons() {
-  const buttons = [...globalTabs.filter(Boolean)];
-  if (globalSeeAllButton && !globalSeeAllButton.classList.contains('hidden')) {
-    buttons.push(globalSeeAllButton);
-  }
-  if (globalBackButton) buttons.push(globalBackButton);
-  return buttons;
-}
-
-function refreshGlobalNav(preferBack = true) {
-  const buttons = getGlobalNavButtons();
-  globalLeaderboardNav = createMenuNav(buttons);
-  globalLeaderboardNav.reset(preferBack ? buttons.length - 1 : 0);
-  return globalLeaderboardNav;
-}
+const SEEN_ONLINE_KEY = 'figglesnoot_seen_online_leaderboard';
 
 const leaderboardScreens = {
   normal: {
@@ -80,8 +55,14 @@ export function initLeaderboard(onMenuEnter, onMenuLeave) {
   });
 
   globalLeaderboardButton.addEventListener('click', () => {
-    playSound(selectSound);
-    openGlobalLeaderboard('leaderboard');
+    openGlobalLeaderboard();
+  });
+
+  document.getElementById('back-from-global-intro-button')?.addEventListener('click', () => {
+    cancelGlobalIntro();
+    playSound(dungSound);
+    switchScreens('globalLeaderboard', 'leaderboard');
+    window.dispatchEvent(new CustomEvent('leaderboard:reset'));
   });
 
   backFromLeaderboardButton.addEventListener('click', () => {
@@ -149,46 +130,10 @@ export function initLeaderboard(onMenuEnter, onMenuLeave) {
       document.querySelectorAll('.global-mode-tabs .menu-button').forEach((t) => t.classList.remove('selected'));
       tab.classList.add('selected');
       activeGlobalMode = tab.dataset.mode || 'base';
+      const container = document.getElementById('global-scores-container');
+      if (container) delete container.dataset.showAll;
       loadGlobalLeaderboard(activeGlobalMode);
     });
-  });
-
-  globalSeeAllButton?.addEventListener('click', () => {
-    playSound(selectSound);
-    globalShowAll = !globalShowAll;
-    renderCachedGlobalScores();
-  });
-}
-
-function openGlobalLeaderboard(fromScreen) {
-  const enterBoard = () => {
-    switchScreens('globalIntro', 'globalLeaderboard');
-    startGlobalLeaderboardMusic();
-    loadGlobalLeaderboard(activeGlobalMode);
-  };
-
-  if (!hasSeenOnlineMode()) {
-    playGlobalIntro(fromScreen, enterBoard);
-    return;
-  }
-
-  switchScreens(fromScreen, 'globalLeaderboard');
-  startGlobalLeaderboardMusic();
-  loadGlobalLeaderboard(activeGlobalMode);
-}
-
-function renderCachedGlobalScores() {
-  const container = document.getElementById('global-scores-container');
-  if (!container) return;
-
-  import('./bootstrap-online.js').then(async ({ bootstrapOnlineServices, getOnlineModule }) => {
-    await bootstrapOnlineServices();
-    const online = getOnlineModule();
-    if (!online || !cachedGlobalScores.length) return;
-    online.renderGlobalScores(container, cachedGlobalScores, activeGlobalMode, {
-      showAll: globalShowAll,
-    });
-    refreshGlobalNav(true);
   });
 }
 
@@ -218,8 +163,11 @@ export function handleGameModeScoresNavigation(event) {
 }
 
 export function handleGlobalLeaderboardNavigation(event) {
-  if (!globalLeaderboardNav) refreshGlobalNav(true);
-  globalLeaderboardNav?.handleKey(event);
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    playSound(dungSound);
+    backFromGlobalButton.click();
+  }
 }
 
 export function showBombConfirmation(container) {
@@ -268,32 +216,107 @@ function displayPersonalScores() {
 }
 
 function displayNormalModeScores() {
-  displayModeScores(normalScoresContainer, filterScores('base'), 'Normal');
+  displayModeScores(normalScoresContainer, getAllModeScores('base'), 'Normal');
 }
 
 function displayTimeAttackScores() {
-  displayModeScores(timeAttackScoresContainer, filterScores('timeAttack'), 'Time Attack');
+  displayModeScores(timeAttackScoresContainer, getAllModeScores('timeAttack'), 'Time Attack');
 }
 
 function displayBlackoutScores() {
-  displayModeScores(blackoutScoresContainer, filterScores('blackout'), 'Blackout');
+  displayModeScores(blackoutScoresContainer, getAllModeScores('blackout'), 'Blackout');
 }
 
-function filterScores(mode) {
+function hasSeenOnlineLeaderboard() {
+  return localStorage.getItem(SEEN_ONLINE_KEY) === '1';
+}
+
+function markSeenOnlineLeaderboard() {
+  localStorage.setItem(SEEN_ONLINE_KEY, '1');
+}
+
+function showGlobalComingSoon() {
+  document.getElementById('global-coming-soon')?.classList.remove('hidden');
+  document.getElementById('global-leaderboard-content')?.classList.add('hidden');
+}
+
+function showGlobalLeaderboardContent() {
+  document.getElementById('global-coming-soon')?.classList.add('hidden');
+  document.getElementById('global-leaderboard-content')?.classList.remove('hidden');
+}
+
+function cancelGlobalIntro() {
+  if (globalIntroTimer) {
+    clearTimeout(globalIntroTimer);
+    globalIntroTimer = null;
+  }
+  document.getElementById('global-cat-gif')?.classList.remove('cat-explode');
+  globalIntroResolve?.();
+  globalIntroResolve = null;
+}
+
+function playGlobalIntroAnimation() {
+  return new Promise((resolve) => {
+    globalIntroResolve = resolve;
+    globalIntroTimer = setTimeout(() => {
+      globalIntroTimer = null;
+      const cat = document.getElementById('global-cat-gif');
+      cat?.classList.add('cat-explode');
+      playSound(boomSmallSound);
+      setTimeout(() => {
+        cat?.classList.remove('cat-explode');
+        markSeenOnlineLeaderboard();
+        resolve();
+        globalIntroResolve = null;
+      }, 700);
+    }, 2000);
+  });
+}
+
+async function openGlobalLeaderboard() {
+  playSound(selectSound);
+  switchScreens('leaderboard', 'globalLeaderboard');
+  startGlobalLeaderboardMusic();
+
+  if (!hasSeenOnlineLeaderboard()) {
+    showGlobalComingSoon();
+    await playGlobalIntroAnimation();
+    showGlobalLeaderboardContent();
+  } else {
+    showGlobalLeaderboardContent();
+  }
+
+  loadGlobalLeaderboard(activeGlobalMode);
+}
+
+function getAllModeScores(mode) {
   return JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]')
     .filter((score) => score.mode === mode)
-    .sort((a, b) => b.level - a.level)
-    .slice(0, 5);
+    .sort((a, b) => b.level - a.level);
 }
 
-function displayModeScores(container, scores, mode) {
+function displayModeScores(container, allScores, mode) {
+  const showAll = container.dataset.showAll === 'true';
+  const scores = showAll ? allScores : allScores.slice(0, 5);
   container.innerHTML = '';
-  if (scores.length === 0) {
+  if (allScores.length === 0) {
     container.innerHTML = '<div class="no-scores">No scores yet! Play some games to see your best levels here.</div>';
   } else {
     scores.forEach((score, index) => {
       container.appendChild(buildScoreEntry(score, index, mode));
     });
+    if (!showAll && allScores.length > 5) {
+      const seeAllBtn = document.createElement('button');
+      seeAllBtn.type = 'button';
+      seeAllBtn.className = 'menu-button global-see-all-button';
+      seeAllBtn.textContent = 'See All';
+      seeAllBtn.addEventListener('click', () => {
+        playSound(selectSound);
+        container.dataset.showAll = 'true';
+        displayModeScores(container, allScores, mode);
+      });
+      container.appendChild(seeAllBtn);
+    }
   }
   addBombButton(container);
 }
@@ -412,12 +435,9 @@ async function loadGlobalLeaderboard(mode) {
   const status = document.getElementById('global-scores-status');
   if (!container) return;
 
-  globalShowAll = false;
-
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     if (status) status.textContent = 'Offline — connect to view global scores.';
     container.innerHTML = '<div class="no-scores">Playing local only. Global board needs internet.</div>';
-    globalSeeAllButton?.classList.add('hidden');
     return;
   }
 
@@ -428,7 +448,6 @@ async function loadGlobalLeaderboard(mode) {
       <p class="loading-spinner-text">Loading scores…</p>
     </div>
   `;
-  globalSeeAllButton?.classList.add('hidden');
 
   try {
     const { bootstrapOnlineServices, getOnlineModule } = await import('./bootstrap-online.js');
@@ -436,14 +455,12 @@ async function loadGlobalLeaderboard(mode) {
     const online = getOnlineModule();
     if (!online) throw new Error('Online module unavailable');
 
-    cachedGlobalScores = await online.fetchTopScores(mode);
-    online.renderGlobalScores(container, cachedGlobalScores, mode, { showAll: false });
-    refreshGlobalNav(true);
+    const scores = await online.fetchTopScores(mode);
+    online.renderGlobalScores(container, scores, mode);
     if (status) status.textContent = '';
   } catch (err) {
     console.warn('Global leaderboard load failed:', err);
     if (status) status.textContent = 'Could not load leaderboard.';
     container.innerHTML = '<div class="no-scores">Offline or unavailable — try again later.</div>';
-    globalSeeAllButton?.classList.add('hidden');
   }
 }

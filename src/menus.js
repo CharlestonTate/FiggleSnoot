@@ -45,9 +45,7 @@ import {
 import {
 
   initAccountScreen, onAccountScreenOpen, handleAccountNavigation,
-
   handleAccountSignInNavigation, handleAccountSignUpNavigation,
-
   handleAccountForgotNavigation, handleAccountSignOutNavigation,
 
 } from './account-screen.js';

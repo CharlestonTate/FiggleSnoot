@@ -21,10 +21,10 @@ export function getAuthModule() {
 }
 
 function markAccountOffline(message) {
-  const signedOutHub = document.getElementById('account-signed-out-hub');
+  const guestActions = document.getElementById('account-guest-actions');
   const signedIn = document.getElementById('account-signed-in');
-  if (!signedOutHub) return;
-  signedOutHub.classList.remove('hidden');
+  if (!guestActions) return;
+  guestActions.classList.remove('hidden');
   signedIn?.classList.add('hidden');
   const hint = document.getElementById('account-offline-hint');
   if (hint) {

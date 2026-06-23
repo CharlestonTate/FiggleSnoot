@@ -5,20 +5,32 @@ import {
   getOnlineModule,
   isOnlineServicesReady,
 } from './bootstrap-online.js';
-import { createMenuNav, createSignOutConfirmNav } from './menu-nav.js';
+import { createAccountNav, createMenuNav } from './menu-nav.js';
 import { playSound, dungSound, selectSound, badWiggleSound } from './audio.js';
 import { mapFirebaseError } from './firebase-errors.js';
 import { renderAccountStatsHtml } from './player-stats.js';
-import { switchScreens, hideScreen, showScreen } from './screens.js';
+import { switchScreens } from './screens.js';
 
 let wired = false;
 
-const ERROR_IDS = {
-  hub: 'account-error',
-  signIn: 'account-signin-error',
-  signUp: 'account-signup-error',
-  forgot: 'account-forgot-error',
-};
+const hubNav = createAccountNav(() => getHubButtons());
+const signInNav = createMenuNav([
+  document.getElementById('account-signin-button'),
+  document.getElementById('account-forgot-password-button'),
+  document.getElementById('account-signin-back-button'),
+]);
+const signUpNav = createMenuNav([
+  document.getElementById('account-signup-button'),
+  document.getElementById('account-signup-back-button'),
+]);
+const forgotNav = createMenuNav([
+  document.getElementById('account-reset-password-button'),
+  document.getElementById('account-forgot-back-button'),
+]);
+const signOutNav = createAccountNav(() => [
+  document.getElementById('signout-yes-button'),
+  document.getElementById('signout-no-button'),
+]);
 
 function getHubButtons() {
   const signedIn = document.getElementById('account-signed-in');
@@ -40,48 +52,23 @@ function getHubButtons() {
   ];
 }
 
-let hubNav = null;
-
-function refreshHubNav() {
-  hubNav = createMenuNav(getHubButtons());
-  hubNav.reset();
-}
-
-const signInNav = createMenuNav([
-  document.getElementById('account-signin-submit'),
-  document.getElementById('account-go-forgot-button'),
-  document.getElementById('account-signin-back'),
-]);
-const signUpNav = createMenuNav([
-  document.getElementById('account-signup-submit'),
-  document.getElementById('account-signup-back'),
-]);
-const forgotNav = createMenuNav([
-  document.getElementById('account-forgot-submit'),
-  document.getElementById('account-forgot-back'),
-]);
-const signOutNav = createSignOutConfirmNav([
-  document.getElementById('account-signout-yes'),
-  document.getElementById('account-signout-no'),
-]);
-
-function showMessage(screen, msg, { success = false } = {}) {
-  const id = ERROR_IDS[screen];
-  const el = document.getElementById(id);
+function setMessage(elId, msg, { success = false } = {}) {
+  const el = document.getElementById(elId);
   if (!el) return;
   el.textContent = msg;
   el.classList.toggle('account-success', success);
   el.classList.toggle('hidden', !msg);
 }
 
-function clearMessage(screen) {
-  showMessage(screen, '');
-  const el = document.getElementById(ERROR_IDS[screen]);
-  el?.classList.remove('account-success');
+function clearMessage(elId) {
+  setMessage(elId, '');
 }
 
 function clearAllMessages() {
-  Object.keys(ERROR_IDS).forEach((key) => clearMessage(key));
+  clearMessage('account-error');
+  clearMessage('account-signin-error');
+  clearMessage('account-signup-error');
+  clearMessage('account-forgot-error');
 }
 
 async function withAuthAction(action) {
@@ -133,27 +120,43 @@ function refreshAccountUI() {
   renderLocalStats();
   getAuthModule()?.updateAccountUI?.();
   renderOnlineStats();
-  refreshHubNav();
+  hubNav.reset();
 }
 
-function goToHub() {
-  clearAllMessages();
-  hideScreen('accountSignIn');
-  hideScreen('accountSignUp');
-  hideScreen('accountForgot');
-  hideScreen('accountSignOut');
-  showScreen('account');
-  refreshAccountUI();
+export function resetAccountNav() {
+  hubNav.reset();
+}
+
+export function handleAccountNavigation(event) {
+  return hubNav.handleKey(event);
+}
+
+export function handleAccountSignInNavigation(event) {
+  return signInNav.handleKey(event);
+}
+
+export function handleAccountSignUpNavigation(event) {
+  return signUpNav.handleKey(event);
+}
+
+export function handleAccountForgotNavigation(event) {
+  return forgotNav.handleKey(event);
+}
+
+export function handleAccountSignOutNavigation(event) {
+  return signOutNav.handleKey(event);
 }
 
 function goToSignIn() {
   clearAllMessages();
+  playSound(selectSound);
   switchScreens('account', 'accountSignIn');
   signInNav.reset();
 }
 
 function goToSignUp() {
   clearAllMessages();
+  playSound(selectSound);
   switchScreens('account', 'accountSignUp');
   signUpNav.reset();
 }
@@ -164,189 +167,191 @@ function goToForgot() {
   if (email) {
     document.getElementById('forgot-email').value = email;
   }
+  playSound(selectSound);
   switchScreens('accountSignIn', 'accountForgot');
   forgotNav.reset();
 }
 
-function goToSignOutConfirm() {
+function showAccountHubOnly() {
+  document.getElementById('account-signin-screen')?.classList.add('hidden');
+  document.getElementById('account-signup-screen')?.classList.add('hidden');
+  document.getElementById('account-forgot-screen')?.classList.add('hidden');
+  document.getElementById('account-signout-screen')?.classList.add('hidden');
+  document.getElementById('account-screen')?.classList.remove('hidden');
+}
+
+function goToAccountHubFromSubscreen(fromScreen) {
   clearAllMessages();
+  playSound(dungSound);
+  if (fromScreen) switchScreens(fromScreen, 'account');
+  else showAccountHubOnly();
+  hubNav.reset();
+}
+
+function openSignOutConfirm() {
   const auth = getAuthModule();
   const name = auth?.getDisplayName?.() || auth?.getCurrentUser?.()?.email || 'your account';
-  const nameEl = document.getElementById('signout-username');
-  if (nameEl) nameEl.textContent = name;
+  document.getElementById('signout-username').textContent = name;
+  clearAllMessages();
+  playSound(selectSound);
   switchScreens('account', 'accountSignOut');
   signOutNav.reset();
-}
-
-export function handleAccountNavigation(event) {
-  if (!hubNav) refreshHubNav();
-  return hubNav?.handleKey(event);
-}
-
-export function handleAccountSignInNavigation(event) {
-  if (document.activeElement?.tagName === 'INPUT') return false;
-  return signInNav.handleKey(event);
-}
-
-export function handleAccountSignUpNavigation(event) {
-  if (document.activeElement?.tagName === 'INPUT') return false;
-  return signUpNav.handleKey(event);
-}
-
-export function handleAccountForgotNavigation(event) {
-  if (document.activeElement?.tagName === 'INPUT') return false;
-  return forgotNav.handleKey(event);
-}
-
-export function handleAccountSignOutNavigation(event) {
-  return signOutNav.handleKey(event);
 }
 
 export function initAccountScreen() {
   if (wired) return;
   wired = true;
 
-  document.getElementById('account-go-signin-button')?.addEventListener('click', () => {
-    playSound(selectSound);
-    goToSignIn();
-  });
+  hubNav.bindHover();
+  signOutNav.bindHover();
 
-  document.getElementById('account-go-signup-button')?.addEventListener('click', () => {
-    playSound(selectSound);
-    goToSignUp();
-  });
-
-  document.getElementById('account-back-button')?.addEventListener('click', () => {
+  document.getElementById('account-back-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
     clearAllMessages();
     playSound(dungSound);
     window.dispatchEvent(new CustomEvent('account:back'));
   });
 
-  document.getElementById('account-signin-back')?.addEventListener('click', () => {
-    playSound(dungSound);
-    goToHub();
+  document.getElementById('account-go-signin-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    goToSignIn();
   });
 
-  document.getElementById('account-signup-back')?.addEventListener('click', () => {
-    playSound(dungSound);
-    goToHub();
+  document.getElementById('account-go-signup-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    goToSignUp();
   });
 
-  document.getElementById('account-forgot-back')?.addEventListener('click', () => {
-    playSound(dungSound);
+  document.getElementById('account-signin-back-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    goToAccountHubFromSubscreen('accountSignIn');
+  });
+
+  document.getElementById('account-signup-back-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    goToAccountHubFromSubscreen('accountSignUp');
+  });
+
+  document.getElementById('account-forgot-back-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
     switchScreens('accountForgot', 'accountSignIn');
+    playSound(dungSound);
     signInNav.reset();
   });
 
-  document.getElementById('account-go-forgot-button')?.addEventListener('click', () => {
-    playSound(selectSound);
+  document.getElementById('account-forgot-password-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
     goToForgot();
   });
 
-  document.getElementById('account-signin-submit')?.addEventListener('click', async () => {
-    clearMessage('signIn');
+  document.getElementById('account-signup-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearMessage('account-signup-error');
     playSound(selectSound);
     try {
-      await withAuthAction((auth) => {
-        const email = document.getElementById('signin-email')?.value ?? '';
-        const password = document.getElementById('signin-password')?.value ?? '';
-        return auth.signIn(email, password);
-      });
-      goToHub();
-    } catch (e) {
-      showMessage('signIn', mapFirebaseError(e));
+      await withAuthAction((auth) => auth.signUp(
+        document.getElementById('signup-email')?.value ?? '',
+        document.getElementById('signup-password')?.value ?? '',
+        document.getElementById('signup-displayname')?.value ?? '',
+      ));
+      switchScreens('accountSignUp', 'account');
+      refreshAccountUI();
+    } catch (err) {
+      setMessage('account-signup-error', mapFirebaseError(err));
     }
   });
 
-  document.getElementById('account-signup-submit')?.addEventListener('click', async () => {
-    clearMessage('signUp');
+  document.getElementById('account-signin-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearMessage('account-signin-error');
     playSound(selectSound);
     try {
-      await withAuthAction((auth) => {
-        const email = document.getElementById('signup-email')?.value ?? '';
-        const password = document.getElementById('signup-password')?.value ?? '';
-        const displayName = document.getElementById('signup-displayname')?.value ?? '';
-        return auth.signUp(email, password, displayName);
-      });
-      goToHub();
-    } catch (e) {
-      showMessage('signUp', mapFirebaseError(e));
+      await withAuthAction((auth) => auth.signIn(
+        document.getElementById('signin-email')?.value ?? '',
+        document.getElementById('signin-password')?.value ?? '',
+      ));
+      switchScreens('accountSignIn', 'account');
+      refreshAccountUI();
+    } catch (err) {
+      setMessage('account-signin-error', mapFirebaseError(err));
     }
   });
 
-  document.getElementById('account-forgot-submit')?.addEventListener('click', async () => {
-    clearMessage('forgot');
-    playSound(selectSound);
-    const email = document.getElementById('forgot-email')?.value?.trim();
-    if (!email) {
-      showMessage('forgot', 'Enter your email.');
-      return;
-    }
-    try {
-      await withAuthAction((auth) => auth.resetPassword(email));
-      showMessage('forgot', 'Password reset email sent.', { success: true });
-    } catch (e) {
-      showMessage('forgot', mapFirebaseError(e));
-    }
+  document.getElementById('account-signout-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openSignOutConfirm();
   });
 
-  document.getElementById('account-signout-button')?.addEventListener('click', () => {
-    playSound(selectSound);
-    goToSignOutConfirm();
-  });
-
-  document.getElementById('account-signout-no')?.addEventListener('click', () => {
+  document.getElementById('signout-no-button')?.addEventListener('click', (e) => {
+    e.preventDefault();
     playSound(dungSound);
-    goToHub();
+    switchScreens('accountSignOut', 'account');
+    hubNav.reset();
   });
 
-  document.getElementById('account-signout-yes')?.addEventListener('click', async () => {
+  document.getElementById('signout-yes-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearAllMessages();
     playSound(badWiggleSound);
     try {
       if (isOnlineServicesReady()) {
         await getAuthModule()?.logOut();
       }
-      goToHub();
-    } catch (e) {
-      showMessage('hub', mapFirebaseError(e));
-      goToHub();
+      switchScreens('accountSignOut', 'account');
+      refreshAccountUI();
+    } catch (err) {
+      switchScreens('accountSignOut', 'account');
+      setMessage('account-error', mapFirebaseError(err));
     }
   });
 
-  document.getElementById('account-delete-scores-button')?.addEventListener('click', async () => {
-    clearMessage('hub');
+  document.getElementById('account-delete-scores-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearAllMessages();
     playSound(selectSound);
-    const confirmed = window.confirm(
-      'Delete all your global leaderboard scores? This cannot be undone.',
-    );
-    if (!confirmed) return;
+    if (!window.confirm('Delete all your global leaderboard scores? This cannot be undone.')) return;
     try {
       await withAuthAction((auth) => auth.deleteMyGlobalScores());
-      showMessage('hub', 'Global scores deleted.', { success: true });
+      setMessage('account-error', 'Global scores deleted.', { success: true });
       refreshAccountUI();
-    } catch (e) {
-      showMessage('hub', mapFirebaseError(e));
+    } catch (err) {
+      setMessage('account-error', mapFirebaseError(err));
     }
   });
 
-  document.getElementById('account-delete-account-button')?.addEventListener('click', async () => {
-    clearMessage('hub');
+  document.getElementById('account-delete-account-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearAllMessages();
     playSound(selectSound);
-    const confirmed = window.confirm(
-      'Delete your account permanently? All global scores and profile data will be removed.',
-    );
-    if (!confirmed) return;
+    if (!window.confirm('Delete your account permanently? All global scores and profile data will be removed.')) return;
     const password = window.prompt('Enter your password to confirm:');
     if (!password) {
-      showMessage('hub', 'Account deletion cancelled.');
+      setMessage('account-error', 'Account deletion cancelled.');
       return;
     }
     try {
       await withAuthAction((auth) => auth.deleteAccount(password));
-      showMessage('hub', 'Account deleted.', { success: true });
+      setMessage('account-error', 'Account deleted.', { success: true });
       refreshAccountUI();
-    } catch (e) {
-      showMessage('hub', mapFirebaseError(e));
+    } catch (err) {
+      setMessage('account-error', mapFirebaseError(err));
+    }
+  });
+
+  document.getElementById('account-reset-password-button')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    clearMessage('account-forgot-error');
+    playSound(selectSound);
+    const email = document.getElementById('forgot-email')?.value?.trim();
+    if (!email) {
+      setMessage('account-forgot-error', 'Enter your email.');
+      return;
+    }
+    try {
+      await withAuthAction((auth) => auth.resetPassword(email));
+      setMessage('account-forgot-error', 'Password reset email sent.', { success: true });
+    } catch (err) {
+      setMessage('account-forgot-error', mapFirebaseError(err));
     }
   });
 
@@ -355,15 +360,12 @@ export function initAccountScreen() {
 
 export function onAccountScreenOpen() {
   clearAllMessages();
-  hideScreen('accountSignIn');
-  hideScreen('accountSignUp');
-  hideScreen('accountForgot');
-  hideScreen('accountSignOut');
-  showScreen('account');
+  showAccountHubOnly();
+  hubNav.reset();
   renderLocalStats();
   bootstrapOnlineServices()
     .then(() => refreshAccountUI())
-    .catch(() => refreshHubNav());
+    .catch(() => {});
 }
 
 export function openAccountScreen() {

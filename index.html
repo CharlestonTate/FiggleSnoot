@@ -81,22 +81,23 @@
     </div>
   </div>
 
-  <div id="global-intro-screen" class="screen hidden">
-    <h1 id="global-intro-header" class="global-intro-header">COMING SOON</h1>
-    <img id="global-intro-cat" class="global-intro-cat" src="img/cat.gif" alt="Dancing cat">
-  </div>
-
   <div id="global-leaderboard-screen" class="screen hidden">
-    <h1>Global Leaderboard</h1>
-    <div class="menu-buttons global-mode-tabs">
-      <button id="global-normal-tab" class="menu-button selected" data-mode="base">Normal</button>
-      <button id="global-time-attack-tab" class="menu-button" data-mode="timeAttack">Time Attack</button>
-      <button id="global-blackout-tab" class="menu-button" data-mode="blackout">Blackout</button>
+    <div id="global-coming-soon" class="global-coming-soon hidden">
+      <h1 class="global-coming-soon-title">COMING SOON</h1>
+      <img id="global-cat-gif" class="global-cat-gif" src="img/cat.gif" alt="Dancing cat">
+      <button type="button" id="back-from-global-intro-button" class="menu-button">Back</button>
     </div>
-    <div id="global-scores-container" class="scores-container"></div>
-    <p id="global-scores-status" class="global-scores-status"></p>
-    <button type="button" id="global-see-all-button" class="menu-button hidden">See All</button>
-    <button id="back-from-global-button" class="menu-button selected">Back</button>
+    <div id="global-leaderboard-content" class="global-leaderboard-content hidden">
+      <h1>Global Leaderboard</h1>
+      <div class="menu-buttons global-mode-tabs">
+        <button id="global-normal-tab" class="menu-button selected" data-mode="base">Normal</button>
+        <button id="global-time-attack-tab" class="menu-button" data-mode="timeAttack">Time Attack</button>
+        <button id="global-blackout-tab" class="menu-button" data-mode="blackout">Blackout</button>
+      </div>
+      <div id="global-scores-container" class="scores-container"></div>
+      <p id="global-scores-status" class="global-scores-status"></p>
+      <button id="back-from-global-button" class="menu-button selected">Back</button>
+    </div>
   </div>
 
   <div id="normal-mode-scores-screen" class="screen hidden">
@@ -165,7 +166,7 @@
       <div id="account-stats-container" class="account-stats-container"></div>
       <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
       <p id="account-error" class="account-error hidden"></p>
-      <div id="account-signed-out-hub" class="account-hub-actions">
+      <div id="account-guest-actions" class="account-guest-actions account-auth-row">
         <button type="button" id="account-go-signin-button" class="menu-button selected">Sign In</button>
         <button type="button" id="account-go-signup-button" class="menu-button">Sign Up</button>
       </div>
@@ -184,11 +185,13 @@
     <div class="account-screen-inner">
       <h1>Sign In</h1>
       <p id="account-signin-error" class="account-error hidden"></p>
-      <input type="email" id="signin-email" class="account-input" placeholder="Email" autocomplete="email">
-      <input type="password" id="signin-password" class="account-input" placeholder="Password" autocomplete="current-password">
-      <button type="button" id="account-signin-submit" class="menu-button selected">Sign In</button>
-      <button type="button" id="account-go-forgot-button" class="menu-button account-link-btn">Forgot Password?</button>
-      <button type="button" id="account-signin-back" class="menu-button">Back</button>
+      <div class="account-form">
+        <input type="email" id="signin-email" class="account-input" placeholder="Email" autocomplete="email">
+        <input type="password" id="signin-password" class="account-input" placeholder="Password" autocomplete="current-password">
+        <button type="button" id="account-signin-button" class="menu-button selected">Sign In</button>
+        <button type="button" id="account-forgot-password-button" class="menu-button account-link-btn">Forgot Password?</button>
+        <button type="button" id="account-signin-back-button" class="menu-button">Back</button>
+      </div>
     </div>
   </div>
 
@@ -196,11 +199,13 @@
     <div class="account-screen-inner">
       <h1>Sign Up</h1>
       <p id="account-signup-error" class="account-error hidden"></p>
-      <input type="text" id="signup-displayname" class="account-input" placeholder="Display name" maxlength="20" autocomplete="nickname">
-      <input type="email" id="signup-email" class="account-input" placeholder="Email" autocomplete="email">
-      <input type="password" id="signup-password" class="account-input" placeholder="Password" autocomplete="new-password">
-      <button type="button" id="account-signup-submit" class="menu-button selected">Sign Up</button>
-      <button type="button" id="account-signup-back" class="menu-button">Back</button>
+      <div class="account-form">
+        <input type="text" id="signup-displayname" class="account-input" placeholder="Display name" maxlength="20" autocomplete="nickname">
+        <input type="email" id="signup-email" class="account-input" placeholder="Email" autocomplete="email">
+        <input type="password" id="signup-password" class="account-input" placeholder="Password" autocomplete="new-password">
+        <button type="button" id="account-signup-button" class="menu-button selected">Sign Up</button>
+        <button type="button" id="account-signup-back-button" class="menu-button">Back</button>
+      </div>
     </div>
   </div>
 
@@ -208,10 +213,11 @@
     <div class="account-screen-inner">
       <h1>Forgot Password</h1>
       <p id="account-forgot-error" class="account-error hidden"></p>
-      <p class="account-forgot-hint">Enter your email and we'll send a reset link.</p>
-      <input type="email" id="forgot-email" class="account-input" placeholder="Email" autocomplete="email">
-      <button type="button" id="account-forgot-submit" class="menu-button selected">Send Reset Email</button>
-      <button type="button" id="account-forgot-back" class="menu-button">Back</button>
+      <div class="account-form">
+        <input type="email" id="forgot-email" class="account-input" placeholder="Email" autocomplete="email">
+        <button type="button" id="account-reset-password-button" class="menu-button selected">Send Reset Email</button>
+        <button type="button" id="account-forgot-back-button" class="menu-button">Back</button>
+      </div>
     </div>
   </div>
 
@@ -220,8 +226,8 @@
       <h1>Sign Out</h1>
       <p class="account-signout-prompt">Do you want to sign out of <strong id="signout-username"></strong>?</p>
       <div class="account-auth-row">
-        <button type="button" id="account-signout-yes" class="menu-button selected">Yes</button>
-        <button type="button" id="account-signout-no" class="menu-button">No</button>
+        <button type="button" id="signout-yes-button" class="menu-button selected">Yes</button>
+        <button type="button" id="signout-no-button" class="menu-button">No</button>
       </div>
     </div>
   </div>

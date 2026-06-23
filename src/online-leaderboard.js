@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 import { db, functions, isFirebaseConfigured } from './firebase.js';
 import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
+import { playSound, selectSound } from './audio.js';
 
 const MODE_LABELS = {
   base: 'Normal',
@@ -307,6 +308,7 @@ export async function fetchTopScores(mode, topN = 25) {
 
 export function renderGlobalScores(container, scores, mode, { showAll = false } = {}) {
   if (!container) return;
+  container.innerHTML = '';
 
   if (!isFirebaseConfigured) {
     container.innerHTML = '<div class="no-scores">Set Firebase env vars to enable global leaderboard.</div>';
@@ -318,10 +320,9 @@ export function renderGlobalScores(container, scores, mode, { showAll = false } 
     return;
   }
 
-  container.innerHTML = '';
-  const displayScores = showAll ? scores : scores.slice(0, 5);
+  const visible = showAll ? scores : scores.slice(0, 5);
 
-  displayScores.forEach((score) => {
+  visible.forEach((score) => {
     const entry = document.createElement('div');
     entry.classList.add('score-entry');
     const label = getModeLabel(mode);
@@ -334,11 +335,17 @@ export function renderGlobalScores(container, scores, mode, { showAll = false } 
     container.appendChild(entry);
   });
 
-  const seeAllBtn = document.getElementById('global-see-all-button');
-  if (seeAllBtn) {
-    const hasMore = scores.length > 5;
-    seeAllBtn.classList.toggle('hidden', !hasMore);
-    seeAllBtn.textContent = showAll ? 'Show Top 5' : 'See All';
+  if (!showAll && scores.length > 5) {
+    const seeAllBtn = document.createElement('button');
+    seeAllBtn.type = 'button';
+    seeAllBtn.className = 'menu-button global-see-all-button';
+    seeAllBtn.textContent = 'See All';
+    seeAllBtn.addEventListener('click', () => {
+      playSound(selectSound);
+      renderGlobalScores(container, scores, mode, { showAll: true });
+      window.dispatchEvent(new CustomEvent('global-leaderboard:see-all'));
+    });
+    container.appendChild(seeAllBtn);
   }
 }
 
