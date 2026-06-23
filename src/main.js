@@ -7,14 +7,20 @@ import { initGameControls, initConsole } from './game.js';
 import { initCredits } from './credits.js';
 
 import { initIntegrity } from './integrity.js';
+import { initFormInputState, isFormInputActive } from './form-input-state.js';
 
 const pressedKeys = {};
 
 document.addEventListener('keydown', (event) => {
+  if (isFormInputActive()) return;
   pressedKeys[event.key] = true;
 });
 
 document.addEventListener('keyup', (event) => {
+  if (isFormInputActive()) {
+    pressedKeys[event.key] = false;
+    return;
+  }
   pressedKeys[event.key] = false;
 });
 
@@ -73,6 +79,7 @@ function startAppSession() {
 
 
 function init() {
+  initFormInputState();
   initIntegrity();
 
   initScreens();

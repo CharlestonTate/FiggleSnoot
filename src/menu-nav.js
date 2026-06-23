@@ -1,4 +1,9 @@
 import { playNextSound, playSound, selectSound, dungSound, warfSound } from './audio.js';
+import { isFormInputActive } from './form-input-state.js';
+
+function menuNavBlocked() {
+  return isFormInputActive();
+}
 
 /**
  * Generic vertical menu keyboard + mouse navigation.
@@ -18,6 +23,8 @@ export function createMenuNav(buttons, options = {}) {
   }
 
   function handleKey(event) {
+    if (menuNavBlocked()) return false;
+
     const key = event.key;
     const lower = key.toLowerCase();
 
@@ -84,6 +91,8 @@ export function createMainMenuNav(buttons, fabButton = null) {
   }
 
   function handleKey(event) {
+    if (menuNavBlocked()) return false;
+
     const key = event.key;
     const lower = key.toLowerCase();
 
@@ -204,6 +213,8 @@ export function createLeaderboardNav(buttons) {
   }
 
   function handleKey(event) {
+    if (menuNavBlocked()) return false;
+
     const key = event.key;
     const lower = key.toLowerCase();
 
@@ -277,7 +288,7 @@ export function createAccountNav(getButtons) {
   }
 
   function handleKey(event) {
-    if (document.activeElement?.tagName === 'INPUT') return false;
+    if (menuNavBlocked()) return false;
 
     const buttons = getButtons().filter(Boolean);
     if (!buttons.length) return false;
@@ -369,6 +380,8 @@ export function createBombNav(getButtons) {
   }
 
   function handleKey(event) {
+    if (menuNavBlocked()) return false;
+
     const buttons = getButtons();
     const key = event.key;
     const lower = key.toLowerCase();

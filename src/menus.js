@@ -52,6 +52,8 @@ import {
 
 import { initShop } from './shop.js';
 
+import { isFormInputActive } from './form-input-state.js';
+
 
 
 const mainMenuNav = createMainMenuNav([...menuButtons], accountFab);
@@ -358,6 +360,8 @@ function goToMenu() {
 function handleKeyboardNavigation(event) {
 
   if (consoleContainer && consoleContainer.style.display !== 'none') return;
+
+  if (isFormInputActive()) return;
 
 
 
