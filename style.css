@@ -3105,10 +3105,11 @@ body.integrity-lock {
 
 /* Shop screen — simple 3-column grid */
 #shop-screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   gap: 20px;
+}
+
+#shop-screen.hidden {
+  display: none;
 }
 
 .shop-title {
