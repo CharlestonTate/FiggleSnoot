@@ -15,6 +15,7 @@ const SCREEN_MAP = {
   accountSignUp: 'account-signup-screen',
   accountForgot: 'account-forgot-screen',
   accountSignOut: 'account-signout-screen',
+  shop: 'shop-screen',
   game: 'game-screen',
   gameOver: 'game-over-screen',
   bomb: 'bomb-confirmation-popup',

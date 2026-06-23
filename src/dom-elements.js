@@ -22,6 +22,8 @@ export const bombConfirmationPopup = document.getElementById('bomb-confirmation-
 export const consoleContainer = document.getElementById('console-container');
 
 export const accountFab = document.getElementById('account-fab');
+export const menuHud = document.getElementById('menu-hud');
+export const shopButton = document.getElementById('shop-button');
 
 export const menuButtons = document.querySelectorAll('#menu-screen .menu-button');
 export const gameModeButtons = document.querySelectorAll('#game-mode-screen .menu-button');

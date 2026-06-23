@@ -77,10 +77,13 @@ async function writeLeaderboardEntry(mode, uid, level, time) {
   }
 
   const displayName = await getUserDisplayName(uid);
+  const userDoc = await db.collection('users').doc(uid).get();
+  const skinId = userDoc.data()?.equippedSkin || 'default';
   await entryRef(mode, uid).set({
     level,
     time,
     displayName,
+    skinId,
     updatedAt: FieldValue.serverTimestamp(),
   });
 

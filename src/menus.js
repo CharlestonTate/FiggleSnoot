@@ -2,7 +2,7 @@ import {
 
   playButton, restartButton, menuButton, menuButtons, gameModeButtons, deathButtons,
 
-  consoleContainer, bombConfirmationPopup, accountFab,
+  consoleContainer, bombConfirmationPopup, accountFab, menuHud,
 
 } from './dom-elements.js';
 
@@ -50,21 +50,25 @@ import {
 
 } from './account-screen.js';
 
+import { initShop } from './shop.js';
+
 
 
 const mainMenuNav = createMainMenuNav([...menuButtons], accountFab);
 
-function setAccountFabVisible(visible) {
-  accountFab?.classList.toggle('hidden', !visible);
+const shopNav = createMenuNav([document.getElementById('shop-back-button')]);
+
+function setMenuHudVisible(visible) {
+  menuHud?.classList.toggle('hidden', !visible);
 }
 
 function enterMenu() {
-  setAccountFabVisible(true);
+  setMenuHudVisible(true);
   mainMenuNav.reset();
 }
 
 function leaveMenu() {
-  setAccountFabVisible(false);
+  setMenuHudVisible(false);
 }
 
 const gameModeNav = createMenuNav(gameModeButtons);
@@ -121,11 +125,11 @@ export function initAppMenus() {
 
   initAccountScreen();
 
+  initShop(enterMenu, leaveMenu);
+
 
 
   document.getElementById('play-game-button').addEventListener('click', () => {
-
-    leaveMenu();
 
     switchScreens('menu', 'gameMode');
 
@@ -136,6 +140,8 @@ export function initAppMenus() {
 
 
   document.getElementById('normal-mode-button').addEventListener('click', () => {
+
+    leaveMenu();
 
     setCurrentGameMode('base');
 
@@ -149,6 +155,8 @@ export function initAppMenus() {
 
   document.getElementById('time-attack-button').addEventListener('click', () => {
 
+    leaveMenu();
+
     setCurrentGameMode('timeAttack');
 
     playSound(selectSound);
@@ -160,6 +168,8 @@ export function initAppMenus() {
 
 
   document.getElementById('blackout-button').addEventListener('click', () => {
+
+    leaveMenu();
 
     setCurrentGameMode('blackout');
 
@@ -378,6 +388,8 @@ function handleKeyboardNavigation(event) {
   if (isScreenVisible('gameOver')) { deathNav.handleKey(event); return; }
 
   if (isScreenVisible('menu')) { mainMenuNav.handleKey(event); return; }
+
+  if (isScreenVisible('shop')) { shopNav.handleKey(event); return; }
 
   if (isScreenVisible('gameMode')) { gameModeNav.handleKey(event); return; }
 

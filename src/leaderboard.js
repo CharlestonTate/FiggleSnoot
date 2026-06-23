@@ -44,7 +44,6 @@ const leaderboardScreens = {
 export function initLeaderboard(onMenuEnter, onMenuLeave) {
   document.getElementById('leaderboard-button').addEventListener('click', () => {
     playSound(selectSound);
-    onMenuLeave?.();
     switchScreens('menu', 'leaderboard');
     window.dispatchEvent(new CustomEvent('leaderboard:reset'));
   });

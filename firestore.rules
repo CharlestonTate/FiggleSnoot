@@ -15,7 +15,11 @@ service cloud.firestore {
         && request.resource.data.time <= 86400000
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() >= 1
-        && request.resource.data.displayName.size() <= 20;
+        && request.resource.data.displayName.size() <= 20
+        && (!('skinId' in request.resource.data)
+            || (request.resource.data.skinId is string
+                && request.resource.data.skinId.size() >= 1
+                && request.resource.data.skinId.size() <= 32));
     }
 
     function existingEntry(mode, uid) {

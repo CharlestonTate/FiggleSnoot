@@ -11,6 +11,7 @@ import { walkingSoundEnabled, catModeEnabled } from './settings.js';
 import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold } from './controls.js';
 import { GameModes, initializeGameMode, handleLevelComplete } from './gamemodes.js';
 import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity, verifyRuntimeIntegrity, isIntegrityTriggered } from './integrity.js';
+import { getEquippedSkin, getSkinCssColor } from './skins.js';
 
 let isGameOver = false;
 let gridSize = 7;
@@ -70,11 +71,21 @@ export function getCurrentGameMode() {
 export function updateCoinDisplay() {
   const el = document.getElementById('coin-count');
   if (el) el.textContent = getCoinCount();
+  const shopEl = document.getElementById('shop-coin-count');
+  if (shopEl) shopEl.textContent = getCoinCount();
 }
 
-function getCoinCount() {
+export function getCoinCount() {
   const n = parseInt(localStorage.getItem('figglesnoot_coins') || '0', 10);
   return isNaN(n) ? 0 : n;
+}
+
+export function setCoinCount(count) {
+  const n = Math.max(0, parseInt(count, 10) || 0);
+  withTrustedStorageWrite(() => {
+    localStorage.setItem('figglesnoot_coins', String(n));
+  });
+  updateCoinDisplay();
 }
 
 // Console state
@@ -287,14 +298,6 @@ function trySpawnCoin(path, goal, spawn) {
   return validCells[Math.floor(Math.random() * validCells.length)];
 }
 
-function setCoinCount(count) {
-  const n = Math.max(0, parseInt(count, 10) || 0);
-  withTrustedStorageWrite(() => {
-    localStorage.setItem('figglesnoot_coins', String(n));
-  });
-  updateCoinDisplay();
-}
-
 function addCoins(amount) {
   setCoinCount(getCoinCount() + (amount || 1));
 }
@@ -308,6 +311,8 @@ function renderMaze() {
   const playerKey = `${playerPosition.x},${playerPosition.y}`;
   const goalKey = `${goalPosition.x},${goalPosition.y}`;
   const coinKey = coinPosition ? `${coinPosition.x},${coinPosition.y}` : null;
+  const playerSkinId = getEquippedSkin();
+  const playerSkinColor = getSkinCssColor(playerSkinId);
   
   // Use DocumentFragment for better performance (batch DOM operations)
   const fragment = document.createDocumentFragment();
@@ -325,7 +330,7 @@ function renderMaze() {
       // In blackout mode, make only the player and goal blocks black
       if (currentGameMode === 'blackout') {
         if (isPlayer) {
-          cell.classList.add("player");
+          cell.classList.add("player", `player-skin-${playerSkinId}`);
           if (!hasMovedThisLevel) cell.classList.add("spawn-glow");
           if (catModeEnabled) cell.classList.add("cat-mode");
           cell.style.backgroundColor = '#000';
@@ -342,10 +347,12 @@ function renderMaze() {
       } else {
         if (isMazeVisible || isPlayer || isGoal || isCoin) {
           if (isPlayer) {
-            cell.classList.add("player");
+            cell.classList.add("player", `player-skin-${playerSkinId}`);
             if (!hasMovedThisLevel) cell.classList.add("spawn-glow");
             if (catModeEnabled) cell.classList.add("cat-mode");
-          } 
+            cell.style.setProperty('--player-skin-color', playerSkinColor);
+            cell.style.backgroundColor = playerSkinColor;
+          }
           if (isGoal) {
             cell.classList.add("goal"); 
           } 

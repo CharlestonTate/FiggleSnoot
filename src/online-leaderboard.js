@@ -8,6 +8,7 @@ import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 import { playSound, selectSound } from './audio.js';
 import { assertIntegrityForRankedAction, isIntegrityTriggered } from './integrity.js';
+import { getEquippedSkin, renderSkinSwatchHtml } from './skins.js';
 
 const MODE_LABELS = {
   base: 'Normal',
@@ -137,10 +138,12 @@ async function submitScoreDirect(mode, level, time, uid) {
   }
 
   const displayName = getDisplayName() || getCurrentUser()?.email?.split('@')[0] || 'Player';
+  const skinId = getEquippedSkin();
   await setDoc(doc(db, 'leaderboards', mode, 'entries', uid), {
     level,
     time,
     displayName,
+    skinId,
     updatedAt: serverTimestamp(),
   });
 
@@ -394,7 +397,10 @@ export function renderGlobalScores(container, scores, mode, { showAll = false } 
     const label = getModeLabel(mode);
     entry.innerHTML = `
       <div class="rank">${score.rank}.</div>
-      <div class="mode">${score.displayName || 'Anonymous'}</div>
+      <div class="mode global-player-row">
+        ${renderSkinSwatchHtml(score.skinId || 'default')}
+        <span class="leaderboard-player-name">${score.displayName || 'Anonymous'}</span>
+      </div>
       <div class="score">Level ${score.level || 1}</div>
       <div class="date">${label}</div>
     `;
@@ -433,11 +439,11 @@ export async function fetchUserGlobalEntries(uid) {
 export function renderOnlineStatsHtml(entries) {
   const rows = Object.entries(MODE_LABELS).map(([mode, label]) => {
     const entry = entries[mode];
-    const best = entry ? `Lv ${entry.level}` : '—';
+    const best = entry ? `Level ${entry.level}` : '—';
     return `
-      <div class="account-stat-row">
-        <span class="account-stat-mode">${label} (online)</span>
-        <span class="account-stat-val">Best: ${best}</span>
+      <div class="account-stat-block">
+        <h3 class="account-stat-heading">${label} (online)</h3>
+        <p class="account-stat-detail">Global best: ${best}</p>
       </div>
     `;
   }).join('');
