@@ -439,11 +439,11 @@ export async function fetchUserGlobalEntries(uid) {
 export function renderOnlineStatsHtml(entries) {
   const rows = Object.entries(MODE_LABELS).map(([mode, label]) => {
     const entry = entries[mode];
-    const best = entry ? `Level ${entry.level}` : '—';
+    const best = entry ? `Lv ${entry.level}` : '—';
     return `
-      <div class="account-stat-block">
-        <h3 class="account-stat-heading">${label} (online)</h3>
-        <p class="account-stat-detail">Global best: ${best}</p>
+      <div class="account-stat-row">
+        <span class="account-stat-mode">${label} (online)</span>
+        <span class="account-stat-val">Best: ${best}</span>
       </div>
     `;
   }).join('');

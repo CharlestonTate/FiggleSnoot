@@ -42,7 +42,7 @@
   </div>
 
   <div id="menu-hud" class="menu-hud hidden">
-    <button type="button" id="shop-button" class="hud-shop-btn" title="Shop" aria-label="Shop">Shop</button>
+    <button type="button" id="shop-button" class="hud-shop-btn" title="Store" aria-label="Store">Store</button>
     <div class="coin-counter" aria-label="Coins">
       <span id="coin-count">0</span>
       <span class="coin-label">coins</span>
@@ -51,15 +51,10 @@
   </div>
 
   <div id="shop-screen" class="screen hidden">
-    <div class="shop-screen-inner">
-      <div class="shop-header">
-        <h1>Shop</h1>
-        <p class="shop-balance"><span id="shop-coin-count">0</span> coins</p>
-      </div>
-      <p id="shop-message" class="shop-message hidden"></p>
-      <div id="shop-grid" class="shop-grid"></div>
-      <button type="button" id="shop-back-button" class="menu-button">Back</button>
-    </div>
+    <h1 class="shop-title">Store</h1>
+    <p id="shop-message" class="shop-message hidden"></p>
+    <div id="shop-grid" class="shop-grid-simple"></div>
+    <button type="button" id="shop-back-button" class="menu-button">Back</button>
   </div>
 
   <div id="game-mode-screen" class="screen hidden">
@@ -176,27 +171,23 @@
   </div>
 
   <div id="account-screen" class="screen hidden">
-    <div class="account-screen-layout">
-      <header class="account-header">
-        <h1 id="account-title-name">Account</h1>
-        <button type="button" id="account-signout-button" class="menu-button account-corner-btn account-signout-corner hidden">Sign Out</button>
-      </header>
-      <div id="account-equipped-skin" class="account-equipped-skin"></div>
+    <div class="account-screen-inner">
+      <h1>Account</h1>
+      <div id="account-stats-container" class="account-stats-container"></div>
       <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
       <p id="account-error" class="account-error hidden"></p>
-      <div id="account-stats-container" class="account-stats-container"></div>
       <div id="account-guest-actions" class="account-guest-actions account-auth-row">
         <button type="button" id="account-go-signin-button" class="menu-button selected">Sign In</button>
         <button type="button" id="account-go-signup-button" class="menu-button">Sign Up</button>
       </div>
       <div id="account-signed-in" class="account-signed-in hidden">
+        <p class="account-greeting">Playing as <strong id="account-display-name"></strong></p>
         <div id="account-online-stats" class="account-online-stats hidden"></div>
+        <button type="button" id="account-signout-button" class="menu-button">Sign Out</button>
+        <button type="button" id="account-delete-scores-button" class="menu-button account-danger-btn">Delete Global Scores</button>
+        <button type="button" id="account-delete-account-button" class="menu-button account-danger-btn">Delete Account</button>
       </div>
-      <footer class="account-footer">
-        <button type="button" id="account-delete-scores-button" class="menu-button account-corner-btn account-footer-left account-danger-btn hidden">Delete Global Scores</button>
-        <button type="button" id="account-delete-account-button" class="menu-button account-corner-btn account-footer-right account-danger-btn hidden">Delete Account</button>
-        <button type="button" id="account-back-button" class="menu-button account-back-bottom">Back</button>
-      </footer>
+      <button type="button" id="account-back-button" class="menu-button">Back</button>
     </div>
   </div>
 

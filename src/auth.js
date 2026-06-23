@@ -144,31 +144,17 @@ export async function deleteAccount(password) {
 
 export function updateAccountUI() {
   const guestActions = document.getElementById('account-guest-actions');
-  const signedInPanel = document.getElementById('account-signed-in');
-  const titleEl = document.getElementById('account-title-name');
-  const signOutBtn = document.getElementById('account-signout-button');
-  const deleteScoresBtn = document.getElementById('account-delete-scores-button');
-  const deleteAccountBtn = document.getElementById('account-delete-account-button');
-  const skinEl = document.getElementById('account-equipped-skin');
-
-  if (!guestActions || !signedInPanel) return;
+  const signedIn = document.getElementById('account-signed-in');
+  const nameEl = document.getElementById('account-display-name');
+  if (!guestActions || !signedIn) return;
 
   if (currentUser) {
     guestActions.classList.add('hidden');
-    signedInPanel.classList.remove('hidden');
-    signOutBtn?.classList.toggle('hidden', !currentUser);
-    deleteScoresBtn?.classList.toggle('hidden', !currentUser);
-    deleteAccountBtn?.classList.toggle('hidden', !currentUser);
-    skinEl?.classList.remove('hidden');
-    if (titleEl) titleEl.textContent = currentDisplayName || currentUser.email || 'Account';
+    signedIn.classList.remove('hidden');
+    if (nameEl) nameEl.textContent = currentDisplayName || currentUser.email;
   } else {
     guestActions.classList.remove('hidden');
-    signedInPanel.classList.add('hidden');
-    signOutBtn?.classList.add('hidden');
-    deleteScoresBtn?.classList.add('hidden');
-    deleteAccountBtn?.classList.add('hidden');
-    skinEl?.classList.remove('hidden');
-    if (titleEl) titleEl.textContent = 'Account';
+    signedIn.classList.add('hidden');
   }
 }
 

@@ -11,7 +11,6 @@ import { mapFirebaseError } from './firebase-errors.js';
 import { renderAccountStatsHtml } from './player-stats.js';
 import { switchScreens } from './screens.js';
 import { initProfanityInputGuards } from './profanity-filter.js';
-import { getEquippedSkin, getSkinById, renderSkinSwatchHtml } from './skins.js';
 
 let wired = false;
 
@@ -118,19 +117,8 @@ async function renderOnlineStats() {
   }
 }
 
-function renderEquippedSkin() {
-  const el = document.getElementById('account-equipped-skin');
-  if (!el) return;
-  const skin = getSkinById(getEquippedSkin());
-  el.innerHTML = `
-    ${renderSkinSwatchHtml(skin.id, { size: 'lg' })}
-    <p class="account-equipped-skin-name">${skin.name}</p>
-  `;
-}
-
 function refreshAccountUI() {
   renderLocalStats();
-  renderEquippedSkin();
   getAuthModule()?.updateAccountUI?.();
   renderOnlineStats();
   hubNav.reset();
@@ -371,7 +359,6 @@ export function initAccountScreen() {
   });
 
   window.addEventListener('auth:change', () => refreshAccountUI());
-  window.addEventListener('skin:change', () => renderEquippedSkin());
 }
 
 export function onAccountScreenOpen() {
@@ -379,7 +366,6 @@ export function onAccountScreenOpen() {
   showAccountHubOnly();
   hubNav.reset();
   renderLocalStats();
-  renderEquippedSkin();
   bootstrapOnlineServices()
     .then(() => refreshAccountUI())
     .catch(() => {});

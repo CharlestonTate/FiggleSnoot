@@ -1,7 +1,7 @@
 const MODE_LABELS = {
-  base: 'Normal Mode',
+  base: 'Normal',
   timeAttack: 'Time Attack',
-  blackout: 'Blackout Mode',
+  blackout: 'Blackout',
 };
 
 const MODES = ['base', 'timeAttack', 'blackout'];
@@ -35,21 +35,17 @@ export function renderAccountStatsHtml() {
   const { perMode, totalGames, overallBest } = getPlayerStats();
 
   const rows = perMode.map((m) => `
-    <div class="account-stat-block">
-      <h3 class="account-stat-heading">${m.label}</h3>
-      <p class="account-stat-detail">${m.gamesPlayed} games played</p>
-      <p class="account-stat-detail">Best: Level ${m.bestLevel ?? '—'}</p>
+    <div class="account-stat-row">
+      <span class="account-stat-mode">${m.label}</span>
+      <span class="account-stat-val">${m.gamesPlayed} games</span>
+      <span class="account-stat-val">Best: Lv ${m.bestLevel ?? '—'}</span>
     </div>
   `).join('');
 
   return `
     <div class="account-stats-panel">
       <h2 class="account-stats-title">Your Stats</h2>
-      <div class="account-stat-block account-stat-summary-block">
-        <h3 class="account-stat-heading">Overall</h3>
-        <p class="account-stat-detail">Total games: ${totalGames}</p>
-        <p class="account-stat-detail">Best level: ${overallBest ?? '—'}</p>
-      </div>
+      <p class="account-stat-summary">Total games: <strong>${totalGames}</strong> · Overall best: <strong>Lv ${overallBest ?? '—'}</strong></p>
       ${rows}
     </div>
   `;
