@@ -2,7 +2,6 @@ import { isOnline, withTimeout } from './network.js';
 import {
   bootstrapOnlineServices,
   getAuthModule,
-  getOnlineModule,
   isOnlineServicesReady,
 } from './bootstrap-online.js';
 import { createAccountNav, createMenuNav } from './menu-nav.js';
@@ -90,37 +89,9 @@ function renderLocalStats() {
   container.innerHTML = renderAccountStatsHtml();
 }
 
-async function renderOnlineStats() {
-  const onlineEl = document.getElementById('account-online-stats');
-  if (!onlineEl) return;
-
-  const auth = getAuthModule();
-  const user = auth?.getCurrentUser?.();
-  if (!user) {
-    onlineEl.classList.add('hidden');
-    onlineEl.innerHTML = '';
-    return;
-  }
-
-  try {
-    await bootstrapOnlineServices();
-    const online = getOnlineModule();
-    if (!online?.fetchUserGlobalEntries) {
-      onlineEl.classList.add('hidden');
-      return;
-    }
-    const entries = await withTimeout(online.fetchUserGlobalEntries(user.uid), 10000);
-    onlineEl.innerHTML = online.renderOnlineStatsHtml(entries);
-    onlineEl.classList.remove('hidden');
-  } catch {
-    onlineEl.classList.add('hidden');
-  }
-}
-
 function refreshAccountUI() {
   renderLocalStats();
   getAuthModule()?.updateAccountUI?.();
-  renderOnlineStats();
   hubNav.reset();
 }
 

@@ -2810,6 +2810,10 @@ input:checked + .toggle-slider:before {
 }
 
 /* Account screen layout */
+#account-screen .account-screen-inner {
+  padding-bottom: 88px;
+}
+
 .account-screen-inner {
   display: flex;
   flex-direction: column;
@@ -2879,7 +2883,68 @@ input:checked + .toggle-slider:before {
 }
 
 .account-greeting {
-  margin: 8px 0 16px;
+  margin: 4px 0 20px;
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.account-greeting.hidden {
+  display: none;
+}
+
+.account-delete-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.account-delete-bar.hidden {
+  display: none;
+}
+
+.account-delete-bar .menu-button {
+  pointer-events: auto;
+  width: auto;
+  max-width: calc(50% - 8px);
+  min-width: 0;
+  padding: 12px 14px !important;
+  font-size: 0.85rem !important;
+  opacity: 1 !important;
+  animation: none !important;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.account-delete-corner-left {
+  margin-right: auto;
+}
+
+.account-delete-corner-right {
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .account-delete-bar {
+    bottom: 12px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .account-delete-bar .menu-button {
+    max-width: calc(50% - 4px);
+    padding: 10px 8px !important;
+    font-size: 0.75rem !important;
+  }
 }
 
 .account-online-stats {

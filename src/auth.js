@@ -145,16 +145,22 @@ export async function deleteAccount(password) {
 export function updateAccountUI() {
   const guestActions = document.getElementById('account-guest-actions');
   const signedIn = document.getElementById('account-signed-in');
+  const greeting = document.getElementById('account-greeting');
+  const deleteBar = document.getElementById('account-delete-bar');
   const nameEl = document.getElementById('account-display-name');
   if (!guestActions || !signedIn) return;
 
   if (currentUser) {
     guestActions.classList.add('hidden');
     signedIn.classList.remove('hidden');
+    greeting?.classList.remove('hidden');
+    deleteBar?.classList.remove('hidden');
     if (nameEl) nameEl.textContent = currentDisplayName || currentUser.email;
   } else {
     guestActions.classList.remove('hidden');
     signedIn.classList.add('hidden');
+    greeting?.classList.add('hidden');
+    deleteBar?.classList.add('hidden');
   }
 }
 

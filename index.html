@@ -173,6 +173,7 @@
   <div id="account-screen" class="screen hidden">
     <div class="account-screen-inner">
       <h1>Account</h1>
+      <p id="account-greeting" class="account-greeting hidden">Playing as <strong id="account-display-name"></strong></p>
       <div id="account-stats-container" class="account-stats-container"></div>
       <p id="account-offline-hint" class="account-offline-hint hidden">Online accounts unavailable (offline or not configured). You can still play locally.</p>
       <p id="account-error" class="account-error hidden"></p>
@@ -181,13 +182,13 @@
         <button type="button" id="account-go-signup-button" class="menu-button">Sign Up</button>
       </div>
       <div id="account-signed-in" class="account-signed-in hidden">
-        <p class="account-greeting">Playing as <strong id="account-display-name"></strong></p>
-        <div id="account-online-stats" class="account-online-stats hidden"></div>
         <button type="button" id="account-signout-button" class="menu-button">Sign Out</button>
-        <button type="button" id="account-delete-scores-button" class="menu-button account-danger-btn">Delete Global Scores</button>
-        <button type="button" id="account-delete-account-button" class="menu-button account-danger-btn">Delete Account</button>
       </div>
       <button type="button" id="account-back-button" class="menu-button">Back</button>
+    </div>
+    <div id="account-delete-bar" class="account-delete-bar hidden">
+      <button type="button" id="account-delete-scores-button" class="menu-button account-danger-btn account-delete-corner-left">Delete Global Scores</button>
+      <button type="button" id="account-delete-account-button" class="menu-button account-danger-btn account-delete-corner-right">Delete Account</button>
     </div>
   </div>
 
