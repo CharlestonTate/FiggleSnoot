@@ -41,8 +41,8 @@ function getSameOriginAssetUrls() {
 
   document.querySelectorAll('script[src]').forEach((el) => add(el.src));
   document.querySelectorAll('link[rel="stylesheet"][href]').forEach((el) => add(el.href));
-  add('/style.css');
-  add('/index.html');
+  // Current page only — do not hardcode /style.css (Vite bundles CSS in prod).
+  add(`${location.pathname || '/'}${location.search || ''}`);
 
   return [...urls];
 }
