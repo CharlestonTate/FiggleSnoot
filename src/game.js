@@ -10,7 +10,7 @@ import {
 import { walkingSoundEnabled, catModeEnabled } from './settings.js';
 import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold } from './controls.js';
 import { GameModes, initializeGameMode, handleLevelComplete } from './gamemodes.js';
-import { withTrustedStorageWrite } from './integrity.js';
+import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity, verifyRuntimeIntegrity, isIntegrityTriggered } from './integrity.js';
 
 let isGameOver = false;
 let gridSize = 7;
@@ -32,6 +32,23 @@ let isTimeAttackMode = false;
 let timer;
 let isDeathAnimationPlaying = false;
 let hasMovedThisLevel = false;
+
+const runSession = {
+  levelsCleared: 0,
+  peakLevel: 1,
+  startedAt: 0,
+};
+
+function resetRunSession() {
+  runSession.levelsCleared = 0;
+  runSession.peakLevel = 1;
+  runSession.startedAt = performance.now();
+}
+
+function recordLevelComplete(newLevel) {
+  runSession.levelsCleared += 1;
+  runSession.peakLevel = Math.max(runSession.peakLevel, newLevel);
+}
 
 function usesCountdownTimer() {
   return currentGameMode === 'timeAttack' || currentGameMode === 'base';
@@ -79,6 +96,7 @@ function toggleConsole() {
 export function startGame() {
   isGameOver = false;
   level = 1;
+  resetRunSession();
   elapsedTime = 0;
   timerRunning = false;
   remainingTime = getModeInitialTimer();
@@ -530,6 +548,7 @@ function checkWin() {
 
     const updatedState = handleLevelComplete(currentGameMode, gameState);
     level = updatedState.level;
+    recordLevelComplete(level);
     elapsedTime = updatedState.elapsedTime;
     timerRunning = updatedState.timerRunning;
     isMazeVisible = updatedState.isMazeVisible;
@@ -600,6 +619,9 @@ function updateHUD() {
 
 function endGame() {
   if (isGameOver) return; // Prevent multiple calls to endGame()
+
+  verifyRuntimeIntegrity();
+  if (isIntegrityTriggered()) return;
 
   stopMobileHold();
   
@@ -799,3 +821,23 @@ export function initConsole() {
 }
 
 export { movePlayer, isGameOver as getIsGameOver };
+
+registerRunIntegrity(() => ({
+  levelsCleared: runSession.levelsCleared,
+  peakLevel: runSession.peakLevel,
+  startedAt: runSession.startedAt,
+  getCurrentLevel: () => level,
+  isGameOver,
+}));
+
+registerProtectedFunction('game.endGame', endGame);
+registerProtectedFunction('game.movePlayer', movePlayer);
+registerProtectedFunction('game.checkWin', checkWin);
+registerProtectedFunction('game.startGame', startGame);
+
+if (!import.meta.env.PROD && typeof window !== 'undefined') {
+  window.__FIGGLE_DEV__ = {
+    ...(window.__FIGGLE_DEV__ || {}),
+    __forceLevel: (n) => { level = n; },
+  };
+}
