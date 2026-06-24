@@ -1,6 +1,6 @@
 import { playSound } from './audio.js';
 import { leaveMenu } from './menus.js';
-import { switchScreens } from './screens.js';
+import { navigateTo } from './screens.js';
 
 /**
  * Credits screen: plays party sound, then shows creator/friends text with fade in/out, then returns to title screen with fade.
@@ -69,7 +69,7 @@ function fadeOut(el, done) {
 
 function goToTitleScreen() {
   leaveMenu();
-  switchScreens('menu', 'title');
+  navigateTo('title');
 
   const titleScreen = document.getElementById('title-screen');
   if (!titleScreen) return;
@@ -88,11 +88,9 @@ function goToTitleScreen() {
 }
 
 function runSequence() {
-  const menuScreen = document.getElementById('menu-screen');
-  if (!menuScreen) return;
-
   leaveMenu();
-  menuScreen.classList.add('hidden');
+  navigateTo(null);
+
   showOverlay();
   overlay.style.display = 'flex';
   slideEl.style.display = 'none';

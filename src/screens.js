@@ -58,6 +58,24 @@ export function switchScreens(from, to) {
   if (to) showScreen(to);
 }
 
+/**
+ * Show exactly one screen — hides every other visible screen first.
+ * Use for menu/HUD navigation so overlays (shop, leaderboard) never stack.
+ */
+export function navigateTo(to) {
+  for (const name of Object.keys(SCREEN_MAP)) {
+    if (name !== to && isScreenVisible(name)) {
+      hideScreen(name);
+    }
+  }
+  if (to) showScreen(to);
+}
+
+/** All screens currently visible (normally should be 0 or 1). */
+export function getVisibleScreens() {
+  return Object.keys(SCREEN_MAP).filter((name) => isScreenVisible(name));
+}
+
 /** Hide every registered screen */
 export function hideAllScreens() {
   Object.keys(screens).forEach(hideScreen);

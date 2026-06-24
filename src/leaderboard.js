@@ -7,7 +7,7 @@ import {
   confirmBombButton, cancelBombButton, personalButtons,
   leaderboardButtons,
 } from './dom-elements.js';
-import { switchScreens, hideScreen, showScreen } from './screens.js';
+import { switchScreens, hideScreen, showScreen, navigateTo } from './screens.js';
 import { withTrustedStorageWrite } from './integrity.js';
 import { loadScoresFromStorage, saveScoresToStorage } from './scores-storage.js';
 import { modeLabel, normalizeGameMode } from './sanitize.js';
@@ -43,10 +43,16 @@ const leaderboardScreens = {
   },
 };
 
+let leaderboardWired = false;
+
 export function initLeaderboard(onMenuEnter, onMenuLeave) {
+  if (leaderboardWired) return;
+  leaderboardWired = true;
+
   document.getElementById('leaderboard-button').addEventListener('click', () => {
     playSound(selectSound);
-    switchScreens('menu', 'leaderboard');
+    onMenuLeave?.();
+    navigateTo('leaderboard');
     window.dispatchEvent(new CustomEvent('leaderboard:reset'));
   });
 
@@ -69,16 +75,15 @@ export function initLeaderboard(onMenuEnter, onMenuLeave) {
 
   backFromLeaderboardButton.addEventListener('click', () => {
     playSound(dungSound);
-    switchScreens('leaderboard', 'menu');
+    navigateTo('menu');
     updateCoinDisplay();
     onMenuEnter?.();
   });
 
   backFromPersonalButton.addEventListener('click', () => {
     playSound(dungSound);
-    switchScreens('personalLeaderboard', 'menu');
-    updateCoinDisplay();
-    onMenuEnter?.();
+    switchScreens('personalLeaderboard', 'leaderboard');
+    window.dispatchEvent(new CustomEvent('leaderboard:reset'));
   });
 
   backFromGlobalButton.addEventListener('click', () => {
@@ -238,6 +243,20 @@ function hasSeenOnlineLeaderboard() {
 
 function markSeenOnlineLeaderboard() {
   localStorage.setItem(SEEN_ONLINE_KEY, '1');
+}
+
+/** Dev/lab helper — run `__FIGGLE_DEV__.resetGlobalIntro()` in the browser console to replay COMING SOON. */
+export function resetGlobalIntro() {
+  localStorage.removeItem(SEEN_ONLINE_KEY);
+  console.log('[FiggleSnoot] Global intro reset. Open Leaderboard → Global to replay the cat explosion.');
+  return true;
+}
+
+if (!import.meta.env.PROD && typeof window !== 'undefined') {
+  window.__FIGGLE_DEV__ = {
+    ...(window.__FIGGLE_DEV__ || {}),
+    resetGlobalIntro,
+  };
 }
 
 function showGlobalComingSoon() {

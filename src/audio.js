@@ -42,14 +42,20 @@ export const uiSounds = [
 export function playSound(audio) {
   if (soundToggle && soundToggle.checked) {
     audio.currentTime = 0;
-    audio.play();
+    const p = audio.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {});
+    }
   }
 }
 
 export function playWalkingSound(audio) {
   if (soundToggle && soundToggle.checked && walkingSoundToggle && walkingSoundToggle.checked) {
     audio.currentTime = 0;
-    audio.play();
+    const p = audio.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {});
+    }
   }
 }
 

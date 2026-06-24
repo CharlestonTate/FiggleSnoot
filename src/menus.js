@@ -6,7 +6,7 @@ import {
 
 } from './dom-elements.js';
 
-import { switchScreens, isScreenVisible, getVisibleScreen, showScreen } from './screens.js';
+import { switchScreens, isScreenVisible, getVisibleScreen, showScreen, navigateTo } from './screens.js';
 
 import {
 
@@ -83,60 +83,39 @@ const leaderboardNav = createLeaderboardNav(leaderboardButtons);
 
 const bombNav = createBombNav(() => bombConfirmationPopup.querySelectorAll('.menu-button'));
 
-
+let appMenusInitialized = false;
 
 /** Title screen only — first PLAY click runs startAppSession then opens menu */
-
 export function initPlayGate(startAppSession) {
-
   const enterGame = () => {
-
     startAppSession();
-
     goToMenu();
-
   };
-
-
 
   playButton.addEventListener('click', enterGame);
 
-
-
   document.addEventListener('keydown', (event) => {
-
     if (isScreenVisible('title') && event.key === 'Enter' && document.activeElement.tagName !== 'BUTTON') {
-
       event.preventDefault();
-
       enterGame();
-
     }
-
   });
-
 }
 
-
-
 /** Full menu + game UI — runs once after first PLAY */
-
 export function initAppMenus() {
+  if (appMenusInitialized) return;
+  appMenusInitialized = true;
 
   initSettings();
-
   initAccountScreen();
-
   initShop(enterMenu, leaveMenu);
 
 
 
   document.getElementById('play-game-button').addEventListener('click', () => {
-
-    switchScreens('menu', 'gameMode');
-
+    navigateTo('gameMode');
     gameModeNav.reset();
-
   });
 
 
@@ -184,55 +163,36 @@ export function initAppMenus() {
 
 
   document.getElementById('back-to-menu-button').addEventListener('click', () => {
-
     playSound(dungSound);
-
-    switchScreens('gameMode', 'menu');
-
+    navigateTo('menu');
     updateCoinDisplay();
-
     enterMenu();
-
   });
 
 
 
   document.getElementById('back-button').addEventListener('click', () => {
-
     playSound(dungSound);
-
     leaveMenu();
-
-    switchScreens('menu', 'title');
-
+    navigateTo('title');
   });
 
 
 
   document.getElementById('settings-button').addEventListener('click', () => {
-
     playSound(warfSound);
-
     leaveMenu();
-
-    switchScreens('menu', 'settings');
-
+    navigateTo('settings');
     resetSettingsNav();
-
   });
 
 
 
   const openAccountFromMenu = () => {
-
     playSound(selectSound);
-
     leaveMenu();
-
-    switchScreens('menu', 'account');
-
+    navigateTo('account');
     onAccountScreenOpen();
-
   };
 
 
@@ -242,31 +202,18 @@ export function initAppMenus() {
 
 
   window.addEventListener('account:back', () => {
-
     playSound(dungSound);
-
-    switchScreens('account', 'menu');
-
+    navigateTo('menu');
     enterMenu();
-
   });
 
 
 
   window.addEventListener('menus:open-account', () => {
-
     playSound(selectSound);
-
     leaveMenu();
-
-    const from = getVisibleScreen();
-
-    if (from && from !== 'account') switchScreens(from, 'account');
-
-    else showScreen('account');
-
+    navigateTo('account');
     onAccountScreenOpen();
-
   });
 
 
@@ -286,19 +233,12 @@ export function initAppMenus() {
 
 
   const goToMenuFromGameOver = () => {
-
     playSound(dungSound);
-
     birthdaySound.pause();
-
     birthdaySound.currentTime = 0;
-
-    switchScreens('gameOver', 'menu');
-
+    navigateTo('menu');
     updateCoinDisplay();
-
     enterMenu();
-
   };
 
 
@@ -344,15 +284,10 @@ export function initAppMenus() {
 
 
 function goToMenu() {
-
   playSound(selectSound);
-
-  switchScreens('title', 'menu');
-
+  navigateTo('menu');
   updateCoinDisplay();
-
   enterMenu();
-
 }
 
 

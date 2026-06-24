@@ -5,7 +5,7 @@ import {
 import {
   playSound, playNextSound, selectSound, dungSound, jazzSound, muteUiSounds,
 } from './audio.js';
-import { switchScreens } from './screens.js';
+import { navigateTo } from './screens.js';
 import { setSwipeEnabled } from './controls.js';
 
 export let soundEnabled = true;
@@ -24,7 +24,7 @@ export function initSettings() {
 
   settingsBackButton.addEventListener('click', () => {
     playSound(dungSound);
-    switchScreens('settings', 'menu');
+    navigateTo('menu');
     window.dispatchEvent(new CustomEvent('menu:reset'));
   });
 

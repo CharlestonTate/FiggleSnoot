@@ -57,7 +57,7 @@ function getSameOriginAssetUrls() {
 }
 
 async function fetchAndHash(url) {
-  const res = await fetch(url, { cache: 'force-cache', credentials: 'same-origin' });
+  const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`fetch failed ${url}`);
   return hashText(await res.text());
 }
@@ -349,6 +349,61 @@ function scheduleChecks() {
   }, RUNTIME_CHECK_MS);
 }
 
+function installDevCommands() {
+  if (import.meta.env.PROD || typeof window === 'undefined') return;
+
+  window.__FIGGLE_DEV__ = {
+    ...(window.__FIGGLE_DEV__ || {}),
+
+    /** Show the white "nice try" screen immediately */
+    showNiceTry: () => {
+      flagViolation('dev_test');
+      revealCheater();
+    },
+
+    /** Alias for showNiceTry */
+    simulateIntegrityViolation: () => {
+      flagViolation('dev_test');
+      revealCheater();
+    },
+
+    /** Flag tampering silently — die with a PB to trigger the reveal */
+    flagCheater: (reason = 'dev_flag') => flagViolation(reason),
+
+    isCheaterFlagged: () => flagged,
+    isNiceTryVisible: () => revealed,
+    getViolations: () => getIntegrityViolations(),
+
+    /** Attempt to edit scores in console (flags silently, write blocked) */
+    testScoreTamper: () => {
+      localStorage.setItem('figglesnoot_scores', '[]');
+    },
+
+    /** Attempt to edit coins in console (flags silently, write blocked) */
+    testCoinTamper: () => {
+      localStorage.setItem('figglesnoot_coins', '9999');
+    },
+
+    /** Jump to level 999 — flags on next runtime check */
+    testLevelTamper: () => {
+      window.__FIGGLE_DEV__?.__forceLevel?.(999);
+    },
+
+    /** Strip obstacle cells from the maze DOM — flags on next runtime check */
+    testMazeTamper: () => {
+      document.querySelectorAll('#maze .obstacle').forEach((el) => {
+        el.classList.remove('obstacle');
+      });
+    },
+
+    /** Run integrity checks immediately instead of waiting for the interval */
+    runIntegrityCheck: () => verifyRuntimeIntegrity(),
+
+    verifyIntegrity,
+    verifyRuntimeIntegrity,
+  };
+}
+
 export async function initIntegrity() {
   installStorageGuard();
 
@@ -369,4 +424,5 @@ export async function initIntegrity() {
   }
 
   scheduleChecks();
+  installDevCommands();
 }

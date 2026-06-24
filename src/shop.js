@@ -1,4 +1,4 @@
-import { switchScreens } from './screens.js';
+import { navigateTo } from './screens.js';
 import { playSound, selectSound, dungSound } from './audio.js';
 import { updateCoinDisplay, getCoinCount, setCoinCount } from './game.js';
 import {
@@ -112,13 +112,13 @@ export function initShop(enterMenu, leaveMenu) {
   document.getElementById('shop-button')?.addEventListener('click', () => {
     playSound(selectSound);
     leaveMenu();
-    switchScreens('menu', 'shop');
+    navigateTo('shop');
     onShopOpen();
   });
 
   document.getElementById('shop-back-button')?.addEventListener('click', () => {
     playSound(dungSound);
-    switchScreens('shop', 'menu');
+    navigateTo('menu');
     updateCoinDisplay();
     enterMenu();
   });
