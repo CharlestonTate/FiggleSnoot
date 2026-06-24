@@ -130,40 +130,52 @@ Copy `.env.example` to `.env` for local Firebase config.
 
 ---
 
-## 7. App Check (recommended for anti-cheat)
+## 7. App Check (recommended)
 
 1. Firebase Console → **App Check** → register web app (reCAPTCHA v3)
 2. Add `VITE_FIREBASE_APP_CHECK_SITE_KEY` to Netlify env vars
-3. Firebase Console → App Check → **Enforce** for **Cloud Functions** (and optionally Firestore reads)
-4. Redeploy Netlify after adding the env var
+3. Firebase Console → App Check → **Enforce** for **Cloud Firestore**
+4. In `firestore.rules`, change `appCheckOk()` to require `request.app != null` (see comment in rules file)
+5. Redeploy Netlify after adding the env var
 
 For local App Check debug, register a debug token in Firebase Console → App Check → Manage debug tokens. Debug mode is **dev-only** in `src/firebase.js`.
 
 ---
 
-## 8. Anti-cheat architecture (ranked / global leaderboard)
+## 8. Anti-cheat architecture
+
+### Current deployment (Firebase Spark — no Cloud Functions)
 
 | Layer | What it does |
 |-------|----------------|
-| **Cloud Functions** | `startRun` + `submitRun` validate signed-in runs, elapsed time, and max level before writing scores |
-| **Firestore rules** | Clients **cannot** create/update leaderboard entries; only Functions (Admin SDK) write scores |
-| **App Check** | Reduces scripted/bot abuse of callables |
-| **No client fallback** | Removed direct Firestore score writes — ranked submit requires an active run session |
+| **Firestore rules** | Caps first leaderboard entry at level 5, max +5 per update, 60s cooldown, alphanumeric display names matched to profile, private user emails |
+| **Client integrity** | UX deterrent only (`nice try` screen) — **not** a security boundary |
+| **Direct Firestore submit** | Used when Cloud Functions are unavailable (`spark_` session marker) |
+| **App Check** | Optional — enable in Console + tighten rules when ready |
 
-Deploy after changes:
+**Honest limit:** On Spark, a determined attacker with the Firebase SDK can still inflate scores via repeated rule-compliant updates. Rules make casual cheating harder; they cannot prove gameplay happened without server-side run validation.
+
+Deploy rules after changes:
+
+```bash
+npx firebase deploy --only firestore:rules
+```
+
+### Future upgrade (Firebase Blaze + Cloud Functions)
+
+| Layer | What it does |
+|-------|----------------|
+| **Cloud Functions** | `startRun` + `submitRun` validate signed-in runs, elapsed time, and plausibility before writing scores |
+| **Firestore rules** | Deny client create/update on leaderboard entries; Functions write via Admin SDK |
+| **App Check** | Enforced on Firestore and Functions |
+| **No client fallback** | Remove direct Firestore score writes |
+
+Deploy after Blaze upgrade:
 
 ```bash
 cd functions && npm install && cd ..
-firebase deploy --only functions,firestore:rules
+npx firebase deploy --only functions,firestore:rules
 ```
-
-**Requires Firebase Blaze (pay-as-you-go)** only if you deploy Cloud Functions. **Not required** for normal global leaderboard operation.
-
-### Ranked run flow
-
-1. Signed-in player starts a game → client calls `startRun({ mode })` → server creates `runs/{uid}_{mode}`
-2. On death with a global PB → client calls `submitRun({ runId, level, time })` → server validates plausibility and writes leaderboard
-3. Starting a new game while signed in replaces the run doc for that mode
 
 Personal/local scores in `localStorage` remain client-side (low stakes).
 

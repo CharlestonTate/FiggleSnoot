@@ -9,11 +9,9 @@ const MODES = new Set(['base', 'timeAttack', 'blackout']);
 const MAX_LEVEL = 500;
 const MAX_TIME = 86400000;
 const SUBMIT_COOLDOWN_MS = 15000;
-const MAX_LEVEL_JUMP = 5;
 const MIN_MS_PER_LEVEL = 2500;
 const MAX_RUN_MS = 3600000;
-
-const lastSubmitByUid = new Map();
+const TIME_TOLERANCE_MS = 15000;
 
 function validateMode(mode) {
   if (!MODES.has(mode)) {
@@ -45,6 +43,10 @@ function runRef(runId) {
   return db.collection('runs').doc(runId);
 }
 
+function userRef(uid) {
+  return db.collection('users').doc(uid);
+}
+
 async function fetchAllEntries(mode) {
   const snap = await db.collection('leaderboards').doc(mode).collection('entries').get();
   return snap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
@@ -62,7 +64,7 @@ function computeGlobalRank(entries, run, mode, excludeUid = null) {
 }
 
 async function getUserDisplayName(uid) {
-  const userDoc = await db.collection('users').doc(uid).get();
+  const userDoc = await userRef(uid).get();
   const data = userDoc.data();
   return data?.displayName || 'Anonymous';
 }
@@ -77,7 +79,7 @@ async function writeLeaderboardEntry(mode, uid, level, time) {
   }
 
   const displayName = await getUserDisplayName(uid);
-  const userDoc = await db.collection('users').doc(uid).get();
+  const userDoc = await userRef(uid).get();
   const skinId = userDoc.data()?.equippedSkin || 'default';
   await entryRef(mode, uid).set({
     level,
@@ -92,13 +94,14 @@ async function writeLeaderboardEntry(mode, uid, level, time) {
   return { globalRank, isNewPB: true };
 }
 
-function assertSubmitCooldown(uid) {
+async function assertSubmitCooldown(uid) {
+  const snap = await userRef(uid).get();
+  const lastSubmit = snap.data()?.lastSubmitAt || 0;
   const now = Date.now();
-  const lastSubmit = lastSubmitByUid.get(uid) || 0;
   if (now - lastSubmit < SUBMIT_COOLDOWN_MS) {
     throw new HttpsError('resource-exhausted', 'Please wait before submitting again.');
   }
-  lastSubmitByUid.set(uid, now);
+  await userRef(uid).set({ lastSubmitAt: now }, { merge: true });
 }
 
 function assertPlausibleLevel(level, startedAt) {
@@ -112,6 +115,41 @@ function assertPlausibleLevel(level, startedAt) {
   }
 }
 
+function assertPlausibleTime(mode, time, startedAt) {
+  const elapsedMs = Date.now() - startedAt;
+  if (mode === 'timeAttack') {
+    // Remaining timer value — cannot exceed elapsed + starting budget (~20s per level cap)
+    const maxRemaining = Math.min(MAX_TIME, elapsedMs + 120000);
+    if (time > maxRemaining) {
+      throw new HttpsError('invalid-argument', 'Time not plausible for run duration.');
+    }
+    return;
+  }
+  // base/blackout: elapsed or remaining — must not wildly exceed wall-clock elapsed
+  if (time > elapsedMs + TIME_TOLERANCE_MS) {
+    throw new HttpsError('invalid-argument', 'Time not plausible for run duration.');
+  }
+}
+
+async function completeRunSubmission(runId, run, uid, level, time) {
+  const mode = run.mode;
+  validateMode(mode);
+  assertPlausibleLevel(level, run.startedAt);
+  assertPlausibleTime(mode, time, run.startedAt);
+
+  const result = await writeLeaderboardEntry(mode, uid, level, time);
+
+  await runRef(runId).update({
+    status: 'completed',
+    submittedLevel: level,
+    submittedTime: time,
+    peakLevel: Math.max(run.peakLevel || 0, level),
+    completedAt: Date.now(),
+  });
+
+  return result;
+}
+
 export const startRun = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in to start a ranked run.');
@@ -121,7 +159,7 @@ export const startRun = onCall(async (request) => {
   validateMode(mode);
   const uid = request.auth.uid;
   const now = Date.now();
-  const ref = db.collection('runs').doc(`${uid}_${mode}`);
+  const ref = runRef(`${uid}_${mode}`);
 
   await ref.set({
     uid,
@@ -145,7 +183,8 @@ export const submitRun = onCall(async (request) => {
   }
 
   validateScorePayload(level, time);
-  assertSubmitCooldown(request.auth.uid);
+  const uid = request.auth.uid;
+  await assertSubmitCooldown(uid);
 
   const snap = await runRef(runId).get();
   if (!snap.exists) {
@@ -153,7 +192,6 @@ export const submitRun = onCall(async (request) => {
   }
 
   const run = snap.data();
-  const uid = request.auth.uid;
   if (run.uid !== uid) {
     throw new HttpsError('permission-denied', 'Run does not belong to this account.');
   }
@@ -161,24 +199,7 @@ export const submitRun = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'Run already submitted.');
   }
 
-  const mode = run.mode;
-  validateMode(mode);
-  assertPlausibleLevel(level, run.startedAt);
-
-  if (level > (run.peakLevel || 0) + MAX_LEVEL_JUMP) {
-    throw new HttpsError('invalid-argument', 'Level increase exceeds allowed limit.');
-  }
-
-  const result = await writeLeaderboardEntry(mode, uid, level, time);
-
-  await runRef(runId).update({
-    status: 'completed',
-    submittedLevel: level,
-    submittedTime: time,
-    completedAt: Date.now(),
-  });
-
-  return result;
+  return completeRunSubmission(runId, run, uid, level, time);
 });
 
 export const getScoreComparison = onCall(async (request) => {
@@ -216,7 +237,8 @@ export const submitScore = onCall(async (request) => {
   }
 
   validateScorePayload(level, time);
-  assertSubmitCooldown(request.auth.uid);
+  const uid = request.auth.uid;
+  await assertSubmitCooldown(uid);
 
   const snap = await runRef(runId).get();
   if (!snap.exists) {
@@ -224,7 +246,6 @@ export const submitScore = onCall(async (request) => {
   }
 
   const run = snap.data();
-  const uid = request.auth.uid;
   if (run.uid !== uid) {
     throw new HttpsError('permission-denied', 'Run does not belong to this account.');
   }
@@ -232,21 +253,5 @@ export const submitScore = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'Run already submitted.');
   }
 
-  validateMode(run.mode);
-  assertPlausibleLevel(level, run.startedAt);
-
-  if (level > (run.peakLevel || 0) + MAX_LEVEL_JUMP) {
-    throw new HttpsError('invalid-argument', 'Level increase exceeds allowed limit.');
-  }
-
-  const result = await writeLeaderboardEntry(run.mode, uid, level, time);
-
-  await runRef(runId).update({
-    status: 'completed',
-    submittedLevel: level,
-    submittedTime: time,
-    completedAt: Date.now(),
-  });
-
-  return result;
+  return completeRunSubmission(runId, run, uid, level, time);
 });

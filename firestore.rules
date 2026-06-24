@@ -5,6 +5,33 @@ service cloud.firestore {
       return mode in ['base', 'timeAttack', 'blackout'];
     }
 
+    function validSkinId(id) {
+      return id in ['default', 'gold', 'rose', 'ember', 'neon', 'void'];
+    }
+
+    function validDisplayName(name) {
+      return name.matches('^[a-zA-Z0-9]{1,20}$');
+    }
+
+    function skinPrice(id) {
+      return id == 'default' ? 0
+        : id == 'gold' ? 50
+        : id == 'rose' ? 75
+        : id == 'ember' ? 100
+        : id == 'neon' ? 125
+        : id == 'void' ? 150
+        : 999999;
+    }
+
+    function authedClient() {
+      return request.auth != null;
+    }
+
+    // After enabling App Check enforcement in Firebase Console, add: && request.app != null
+    function appCheckOk() {
+      return true;
+    }
+
     function validLeaderboardEntry() {
       return request.resource.data.keys().hasAll(['level', 'time', 'displayName'])
         && request.resource.data.level is int
@@ -14,16 +41,18 @@ service cloud.firestore {
         && request.resource.data.time >= 0
         && request.resource.data.time <= 86400000
         && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() >= 1
-        && request.resource.data.displayName.size() <= 20
+        && validDisplayName(request.resource.data.displayName)
         && (!('skinId' in request.resource.data)
-            || (request.resource.data.skinId is string
-                && request.resource.data.skinId.size() >= 1
-                && request.resource.data.skinId.size() <= 32));
+            || validSkinId(request.resource.data.skinId));
     }
 
     function existingEntry(mode, uid) {
       return get(/databases/$(database)/documents/leaderboards/$(mode)/entries/$(uid));
+    }
+
+    function displayNameMatchesProfile(uid) {
+      return request.resource.data.displayName
+        == get(/databases/$(database)/documents/users/$(uid)).data.displayName;
     }
 
     function isScoreImprovement(mode, uid) {
@@ -43,11 +72,79 @@ service cloud.firestore {
       return !existing.exists || request.resource.data.level <= existing.data.level + 5;
     }
 
+    function firstCreateLevelOk() {
+      return request.resource.data.level <= 5;
+    }
+
+    function updateCooldownOk(mode, uid) {
+      let existing = existingEntry(mode, uid);
+      return !existing.exists
+        || !('updatedAt' in existing.data)
+        || request.time > existing.data.updatedAt + duration.value(60, 's');
+    }
+
+    function validOwnedSkinsList(skins) {
+      return skins is list
+        && skins.size() >= 1
+        && skins.size() <= 6
+        && skins.hasAll(['default']);
+    }
+
+    function validUserCreate() {
+      return request.resource.data.keys().hasOnly([
+          'displayName', 'email', 'equippedSkin', 'ownedSkins', 'coins', 'createdAt'
+        ])
+        && request.resource.data.displayName is string
+        && validDisplayName(request.resource.data.displayName)
+        && request.resource.data.email is string
+        && request.resource.data.email.size() >= 3
+        && request.resource.data.email.size() <= 320
+        && (!('equippedSkin' in request.resource.data) || validSkinId(request.resource.data.equippedSkin))
+        && (!('ownedSkins' in request.resource.data) || validOwnedSkinsList(request.resource.data.ownedSkins))
+        && (!('coins' in request.resource.data)
+            || (request.resource.data.coins is int
+                && request.resource.data.coins >= 0
+                && request.resource.data.coins <= 999999));
+    }
+
+    function validUserUpdate() {
+      let prev = resource.data;
+      let next = request.resource.data;
+      let prevCoins = prev.keys().hasAny(['coins']) && prev.coins is int ? prev.coins : 0;
+      let nextCoins = next.keys().hasAny(['coins']) ? next.coins : prevCoins;
+      let coinDelta = nextCoins - prevCoins;
+      let prevOwned = prev.keys().hasAny(['ownedSkins']) ? prev.ownedSkins : ['default'];
+      let nextOwned = next.keys().hasAny(['ownedSkins']) ? next.ownedSkins : prevOwned;
+
+      return (!('displayName' in next) || (next.displayName == prev.displayName && validDisplayName(next.displayName)))
+        && (!('email' in next) || next.email == prev.email)
+        && (!('equippedSkin' in next) || validSkinId(next.equippedSkin))
+        && (!('ownedSkins' in next) || (
+          validOwnedSkinsList(nextOwned)
+          && nextOwned.size() >= prevOwned.size()
+          && nextOwned.size() <= prevOwned.size() + 1
+        ))
+        && (!('coins' in next) || (
+          nextCoins is int
+          && nextCoins >= 0
+          && nextCoins <= 999999
+          && (
+            coinDelta == 0
+            || (coinDelta > 0 && coinDelta <= 10)
+            || (coinDelta < 0 && (-coinDelta) in [50, 75, 100, 125, 150])
+          )
+        ));
+    }
+
     match /users/{userId} {
-      allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if authedClient() && appCheckOk() && request.auth.uid == userId;
+      allow create: if authedClient() && appCheckOk()
+        && request.auth.uid == userId
+        && validUserCreate();
+      allow update: if authedClient() && appCheckOk()
+        && request.auth.uid == userId
+        && validUserUpdate();
+      allow delete: if authedClient() && appCheckOk() && request.auth.uid == userId;
     }
 
     match /runs/{runId} {
@@ -56,17 +153,21 @@ service cloud.firestore {
 
     match /leaderboards/{mode}/entries/{userId} {
       allow read: if true;
-      allow create: if request.auth != null
+      allow create: if authedClient() && appCheckOk()
         && request.auth.uid == userId
         && validMode(mode)
-        && validLeaderboardEntry();
-      allow update: if request.auth != null
+        && validLeaderboardEntry()
+        && firstCreateLevelOk()
+        && displayNameMatchesProfile(userId);
+      allow update: if authedClient() && appCheckOk()
         && request.auth.uid == userId
         && validMode(mode)
         && validLeaderboardEntry()
         && isScoreImprovement(mode, userId)
-        && levelJumpOk(mode, userId);
-      allow delete: if request.auth != null
+        && levelJumpOk(mode, userId)
+        && updateCooldownOk(mode, userId)
+        && displayNameMatchesProfile(userId);
+      allow delete: if authedClient() && appCheckOk()
         && request.auth.uid == userId
         && validMode(mode);
     }

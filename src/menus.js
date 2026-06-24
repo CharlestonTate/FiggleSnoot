@@ -69,7 +69,7 @@ function enterMenu() {
   mainMenuNav.reset();
 }
 
-function leaveMenu() {
+export function leaveMenu() {
   setMenuHudVisible(false);
 }
 

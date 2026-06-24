@@ -3,6 +3,7 @@ import { db } from './firebase.js';
 
 const OWNED_KEY = 'figglesnoot_owned_skins';
 const EQUIPPED_KEY = 'figglesnoot_equipped_skin';
+const COINS_KEY = 'figglesnoot_coins';
 
 export const SKIN_CATALOG = [
   { id: 'default', name: 'Classic Blue', price: 0, color: '#457b9d' },
@@ -13,9 +14,11 @@ export const SKIN_CATALOG = [
   { id: 'void', name: 'Void', price: 150, color: '#6c5ce7' },
 ];
 
+export const SKIN_IDS = SKIN_CATALOG.map((s) => s.id);
+
 const catalogById = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 
-function readOwned() {
+function readOwnedLocal() {
   try {
     const raw = localStorage.getItem(OWNED_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
@@ -27,10 +30,34 @@ function readOwned() {
   }
 }
 
-function writeOwned(ids) {
+function writeOwnedLocal(ids) {
   const unique = [...new Set(['default', ...ids.filter((id) => catalogById[id])])];
   localStorage.setItem(OWNED_KEY, JSON.stringify(unique));
   return unique;
+}
+
+function readCoinsLocal() {
+  const n = parseInt(localStorage.getItem(COINS_KEY) || '0', 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function writeCoinsLocal(count) {
+  const n = Math.max(0, parseInt(count, 10) || 0);
+  localStorage.setItem(COINS_KEY, String(n));
+  return n;
+}
+
+async function syncUserEconomyToCloud(payload) {
+  if (!db) return;
+  try {
+    const { getCurrentUser } = await import('./auth.js');
+    const uid = getCurrentUser()?.uid;
+    if (!uid) return;
+    await setDoc(doc(db, 'users', uid), payload, { merge: true });
+  } catch (err) {
+    console.warn('Could not sync profile economy:', err);
+    throw err;
+  }
 }
 
 export function getSkinCatalog() {
@@ -41,17 +68,43 @@ export function getSkinById(id) {
   return catalogById[id] || catalogById.default;
 }
 
+export function isValidSkinId(id) {
+  return Boolean(catalogById[id]);
+}
+
+export function getSkinPrice(id) {
+  return catalogById[id]?.price ?? 999999;
+}
+
 export function getEquippedSkin() {
   const id = localStorage.getItem(EQUIPPED_KEY) || 'default';
   return catalogById[id] ? id : 'default';
 }
 
 export function getOwnedSkins() {
-  return readOwned();
+  return readOwnedLocal();
+}
+
+export function getCoinCountLocal() {
+  return readCoinsLocal();
+}
+
+export function setCoinCountLocal(count) {
+  return writeCoinsLocal(count);
 }
 
 export function getSkinCssColor(id) {
   return getSkinById(id).color;
+}
+
+export function createSkinSwatchElement(id, { size = 'sm' } = {}) {
+  const skin = getSkinById(id);
+  const span = document.createElement('span');
+  span.className = size === 'lg' ? 'skin-swatch skin-swatch-lg' : 'skin-swatch';
+  span.style.background = skin.color;
+  span.title = skin.name;
+  span.setAttribute('aria-hidden', 'true');
+  return span;
 }
 
 export function renderSkinSwatchHtml(id, { size = 'sm' } = {}) {
@@ -62,28 +115,41 @@ export function renderSkinSwatchHtml(id, { size = 'sm' } = {}) {
 
 export function applyEquippedSkinFromProfile(skinId) {
   if (!skinId || !catalogById[skinId]) return;
-  const owned = readOwned();
+  const owned = readOwnedLocal();
   if (!owned.includes(skinId)) {
-    writeOwned([...owned, skinId]);
+    writeOwnedLocal([...owned, skinId]);
   }
   localStorage.setItem(EQUIPPED_KEY, skinId);
 }
 
+export function applyProfileEconomy(profile) {
+  if (!profile) return;
+  if (Array.isArray(profile.ownedSkins)) {
+    writeOwnedLocal(profile.ownedSkins.filter((id) => catalogById[id]));
+  }
+  if (typeof profile.coins === 'number' && profile.coins >= 0) {
+    writeCoinsLocal(profile.coins);
+  }
+  if (profile.equippedSkin && catalogById[profile.equippedSkin]) {
+    localStorage.setItem(EQUIPPED_KEY, profile.equippedSkin);
+  }
+  window.dispatchEvent(new CustomEvent('economy:change'));
+}
+
 export async function syncEquippedSkinToCloud(skinId) {
   if (!catalogById[skinId] || !db) return;
-  try {
-    const { getCurrentUser } = await import('./auth.js');
-    const uid = getCurrentUser()?.uid;
-    if (!uid) return;
-    await setDoc(doc(db, 'users', uid), { equippedSkin: skinId }, { merge: true });
-  } catch (err) {
-    console.warn('Could not sync equipped skin:', err);
-  }
+  await syncUserEconomyToCloud({ equippedSkin: skinId });
+}
+
+export async function syncCoinsToCloud(coins) {
+  const n = writeCoinsLocal(coins);
+  await syncUserEconomyToCloud({ coins: n });
+  return n;
 }
 
 export function equipSkin(id) {
   if (!catalogById[id]) throw new Error('Unknown skin.');
-  const owned = readOwned();
+  const owned = readOwnedLocal();
   if (!owned.includes(id)) throw new Error('You do not own this skin.');
   localStorage.setItem(EQUIPPED_KEY, id);
   syncEquippedSkinToCloud(id);
@@ -91,10 +157,10 @@ export function equipSkin(id) {
   return id;
 }
 
-export function purchaseSkin(id, getCoinCount, setCoinCount) {
+export async function purchaseSkin(id, getCoinCount, setCoinCount) {
   const skin = catalogById[id];
   if (!skin) throw new Error('Unknown skin.');
-  const owned = readOwned();
+  const owned = readOwnedLocal();
   if (owned.includes(id)) throw new Error('You already own this skin.');
 
   const coins = getCoinCount();
@@ -102,14 +168,21 @@ export function purchaseSkin(id, getCoinCount, setCoinCount) {
     throw new Error(`Not enough coins. Need ${skin.price}, have ${coins}.`);
   }
 
-  setCoinCount(coins - skin.price);
-  writeOwned([...owned, id]);
-  equipSkin(id);
+  const newCoins = coins - skin.price;
+  const newOwned = writeOwnedLocal([...owned, id]);
+  setCoinCount(newCoins);
+  localStorage.setItem(EQUIPPED_KEY, id);
+
+  await syncUserEconomyToCloud({
+    coins: newCoins,
+    ownedSkins: newOwned,
+    equippedSkin: id,
+  });
+
+  window.dispatchEvent(new CustomEvent('skin:change', { detail: { skinId: id } }));
   return skin;
 }
 
 export function initSkinsFromProfile(profile) {
-  if (profile?.equippedSkin && catalogById[profile.equippedSkin]) {
-    applyEquippedSkinFromProfile(profile.equippedSkin);
-  }
+  applyProfileEconomy(profile);
 }

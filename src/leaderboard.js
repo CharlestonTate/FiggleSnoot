@@ -9,6 +9,8 @@ import {
 } from './dom-elements.js';
 import { switchScreens, hideScreen, showScreen } from './screens.js';
 import { withTrustedStorageWrite } from './integrity.js';
+import { loadScoresFromStorage, saveScoresToStorage } from './scores-storage.js';
+import { modeLabel, normalizeGameMode } from './sanitize.js';
 import {
   playSound, selectSound, dungSound, badWiggleSound, boomSmallSound,
 } from './audio.js';
@@ -201,11 +203,14 @@ function navigateBackToPersonalLeaderboard() {
 }
 
 function displayPersonalScores() {
-  const scores = JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]');
-  personalScoresContainer.innerHTML = '';
+  const scores = loadScoresFromStorage();
+  personalScoresContainer.replaceChildren();
 
   if (scores.length === 0) {
-    personalScoresContainer.innerHTML = '<div class="no-scores">No scores yet! Play some games to see your best levels here.</div>';
+    const msg = document.createElement('div');
+    msg.className = 'no-scores';
+    msg.textContent = 'No scores yet! Play some games to see your best levels here.';
+    personalScoresContainer.appendChild(msg);
     return;
   }
 
@@ -233,20 +238,6 @@ function hasSeenOnlineLeaderboard() {
 
 function markSeenOnlineLeaderboard() {
   localStorage.setItem(SEEN_ONLINE_KEY, '1');
-}
-
-/** Dev/lab helper — run `__FIGGLE_DEV__.resetGlobalIntro()` in the browser console to replay COMING SOON. */
-export function resetGlobalIntro() {
-  localStorage.removeItem(SEEN_ONLINE_KEY);
-  console.log('[FiggleSnoot] Global intro reset. Open Leaderboard → Global to replay the cat explosion.');
-  return true;
-}
-
-if (!import.meta.env.PROD && typeof window !== 'undefined') {
-  window.__FIGGLE_DEV__ = {
-    ...(window.__FIGGLE_DEV__ || {}),
-    resetGlobalIntro,
-  };
 }
 
 function showGlobalComingSoon() {
@@ -304,7 +295,7 @@ async function openGlobalLeaderboard() {
 }
 
 function getAllModeScores(mode) {
-  return JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]')
+  return loadScoresFromStorage()
     .filter((score) => score.mode === mode)
     .sort((a, b) => b.level - a.level);
 }
@@ -338,16 +329,30 @@ function displayModeScores(container, allScores, mode) {
 function buildScoreEntry(score, index, modeOverride) {
   const scoreEntry = document.createElement('div');
   scoreEntry.classList.add('score-entry');
-  const mode = modeOverride || (score.mode === 'base' ? 'Normal'
-    : score.mode === 'timeAttack' ? 'Time Attack'
-      : score.mode === 'blackout' ? 'Blackout' : 'Unknown');
+
+  const mode = modeOverride || modeLabel(normalizeGameMode(score.mode) || score.mode);
   const date = new Date(score.date).toLocaleDateString('en-GB').replace(/\//g, ' / ');
-  scoreEntry.innerHTML = `
-    <div class="rank">${index + 1}.</div>
-    <div class="mode">${mode}</div>
-    <div class="score">Level ${score.level || 1}</div>
-    <div class="date">${date}</div>
-  `;
+
+  const rank = document.createElement('div');
+  rank.className = 'rank';
+  rank.textContent = `${index + 1}.`;
+  scoreEntry.appendChild(rank);
+
+  const modeEl = document.createElement('div');
+  modeEl.className = 'mode';
+  modeEl.textContent = mode;
+  scoreEntry.appendChild(modeEl);
+
+  const levelEl = document.createElement('div');
+  levelEl.className = 'score';
+  levelEl.textContent = `Level ${score.level || 1}`;
+  scoreEntry.appendChild(levelEl);
+
+  const dateEl = document.createElement('div');
+  dateEl.className = 'date';
+  dateEl.textContent = date;
+  scoreEntry.appendChild(dateEl);
+
   return scoreEntry;
 }
 
@@ -366,7 +371,7 @@ function addBombButton(container) {
 function clearScores() {
   if (!currentClearingContainer) return;
 
-  const scores = JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]');
+  const scores = loadScoresFromStorage();
   const modeMap = {
     'normal-scores-container': 'base',
     'time-attack-scores-container': 'timeAttack',
@@ -376,9 +381,9 @@ function clearScores() {
 
   if (modeToClear) {
     withTrustedStorageWrite(() => {
-      localStorage.setItem('figglesnoot_scores', JSON.stringify(
+      saveScoresToStorage(
         scores.filter((score) => score.mode !== modeToClear)
-      ));
+      );
     });
     hideBombConfirmation();
     const currentScreen = currentClearingContainer.closest('.screen');

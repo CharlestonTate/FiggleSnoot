@@ -8,7 +8,9 @@ import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 import { playSound, selectSound } from './audio.js';
 import { assertIntegrityForRankedAction, isIntegrityTriggered } from './integrity.js';
-import { getEquippedSkin, renderSkinSwatchHtml } from './skins.js';
+import { getEquippedSkin, createSkinSwatchElement } from './skins.js';
+import { appendHint, clearChildren } from './sanitize.js';
+import { isIntegrityFlagged } from './integrity.js';
 
 const MODE_LABELS = {
   base: 'Normal',
@@ -90,10 +92,13 @@ export function clearActiveRun() {
   activeRunMode = null;
 }
 
+/** Spark-tier ranked session marker — direct Firestore submit when Functions unavailable. */
+const SPARK_RUN_PREFIX = 'spark_';
+
 /** Start a ranked session when a signed-in player begins a game. */
 export async function startOnlineRun(mode) {
   clearActiveRun();
-  if (isIntegrityTriggered()) return null;
+  if (isIntegrityTriggered() || isIntegrityFlagged()) return null;
   if (!isFirebaseConfigured || !isOnline() || !isSignedIn()) {
     return null;
   }
@@ -115,7 +120,7 @@ export async function startOnlineRun(mode) {
     }
   }
 
-  activeRunId = `client_${uid}_${mode}`;
+  activeRunId = `${SPARK_RUN_PREFIX}${mode}`;
   activeRunMode = mode;
   return activeRunId;
 }
@@ -137,7 +142,7 @@ async function submitScoreDirect(mode, level, time, uid) {
     return null;
   }
 
-  const displayName = getDisplayName() || getCurrentUser()?.email?.split('@')[0] || 'Player';
+  const displayName = getDisplayName() || 'Player';
   const skinId = getEquippedSkin();
   await setDoc(doc(db, 'leaderboards', mode, 'entries', uid), {
     level,
@@ -145,7 +150,7 @@ async function submitScoreDirect(mode, level, time, uid) {
     displayName,
     skinId,
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true });
 
   const updated = await fetchAllEntries(mode);
   const globalRank = computeGlobalRank(updated, run, mode, uid);
@@ -153,6 +158,7 @@ async function submitScoreDirect(mode, level, time, uid) {
 }
 
 export async function getScoreComparison(mode, level, time) {
+  if (isIntegrityFlagged() || isIntegrityTriggered()) return null;
   if (!isFirebaseConfigured || !isOnline()) return null;
 
   const uid = getCurrentUser()?.uid;
@@ -177,6 +183,7 @@ export async function getScoreComparison(mode, level, time) {
 }
 
 export async function submitScore(mode, level, time) {
+  if (isIntegrityFlagged() || isIntegrityTriggered()) return null;
   if (!isFirebaseConfigured || !isOnline() || !isSignedIn()) return null;
 
   await assertIntegrityForRankedAction();
@@ -189,7 +196,7 @@ export async function submitScore(mode, level, time) {
     return null;
   }
 
-  const useFunctions = functions && !activeRunId.startsWith('client_');
+  const useFunctions = functions && activeRunId && !activeRunId.startsWith(SPARK_RUN_PREFIX);
   if (useFunctions) {
     try {
       const fn = httpsCallable(functions, 'submitRun');
@@ -273,13 +280,25 @@ export function fireConfetti() {
   }, 120);
 }
 
-function renderPersonalBestMessage(rank) {
+function renderPersonalBestMessage(container, rank) {
+  clearChildren(container);
+  const pb = document.createElement('p');
+  pb.className = 'online-death-pb';
+  pb.textContent = 'New personal best!';
+  container.appendChild(pb);
+
+  const rankEl = document.createElement('p');
+  rankEl.className = 'online-death-rank';
+  rankEl.textContent = `Global rank: #${rank ?? '?'}`;
+  container.appendChild(rankEl);
+
   const flavor = getRankFlavorMessage(rank);
-  return `
-    <p class="online-death-pb">New personal best!</p>
-    <p class="online-death-rank">Global rank: #${rank ?? '?'}</p>
-    ${flavor ? `<p class="online-death-flavor">${flavor}</p>` : ''}
-  `;
+  if (flavor) {
+    const flavorEl = document.createElement('p');
+    flavorEl.className = 'online-death-flavor';
+    flavorEl.textContent = flavor;
+    container.appendChild(flavorEl);
+  }
 }
 
 /**
@@ -290,60 +309,74 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
   const container = document.getElementById('online-death-message');
   if (!container) return;
 
-  container.innerHTML = '';
+  clearChildren(container);
   container.classList.remove('hidden');
 
+  if (isIntegrityFlagged() || isIntegrityTriggered()) return;
+
   if (!isOnline()) {
-    container.innerHTML = '<p class="online-death-hint">Offline — local scores only.</p>';
+    appendHint(container, 'Offline — local scores only.');
     return;
   }
 
   if (!isFirebaseConfigured) {
-    container.innerHTML = '<p class="online-death-hint">Online leaderboard not configured.</p>';
+    appendHint(container, 'Online leaderboard not configured.');
     return;
   }
 
   if (!isSignedIn()) {
-    container.innerHTML = `
-      <p class="online-death-hint">Make an account to compare your score!</p>
-      <button type="button" class="menu-button account-from-death-btn" id="death-go-account">Create Account</button>
-    `;
-    document.getElementById('death-go-account')?.addEventListener('click', () => {
+    appendHint(container, 'Make an account to compare your score!');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'menu-button account-from-death-btn';
+    btn.id = 'death-go-account';
+    btn.textContent = 'Create Account';
+    btn.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('navigate:account'));
     });
+    container.appendChild(btn);
     return;
   }
 
-  container.innerHTML = '<p class="online-death-hint">Checking global rank…</p>';
+  appendHint(container, 'Checking global rank…');
 
   try {
-    await assertIntegrityForRankedAction();
+    if (isIntegrityFlagged()) return;
+
     const comparison = await getScoreComparison(mode, level, time);
     if (!comparison) {
-      container.innerHTML = '<p class="online-death-hint">Could not load global scores.</p>';
+      clearChildren(container);
+      appendHint(container, 'Could not load global scores.');
       return;
     }
 
     const { countBetter, isGlobalPB, currentGlobalRank } = comparison;
 
     if (isGlobalPB) {
+      await assertIntegrityForRankedAction();
+      if (isIntegrityTriggered()) return;
       if (!activeRunId) {
-        container.innerHTML = '<p class="online-death-hint">Ranked submit requires starting the game while signed in. Local scores saved.</p>';
+        clearChildren(container);
+        appendHint(container, 'Ranked submit requires starting the game while signed in. Local scores saved.');
         return;
       }
       const submit = await submitScore(mode, level, time);
       const rank = submit?.globalRank ?? currentGlobalRank;
       fireConfetti();
-      container.innerHTML = renderPersonalBestMessage(rank);
+      clearChildren(container);
+      renderPersonalBestMessage(container, rank);
     } else {
+      await assertIntegrityForRankedAction();
       clearActiveRun();
+      clearChildren(container);
       const n = countBetter ?? 0;
       const people = n === 1 ? '1 person is' : `${n} people are`;
-      container.innerHTML = `<p class="online-death-hint">${people} better than you</p>`;
+      appendHint(container, `${people} better than you`);
     }
   } catch (err) {
     clearActiveRun();
-    container.innerHTML = `<p class="online-death-hint">${describeOnlineError(err)}</p>`;
+    clearChildren(container);
+    appendHint(container, describeOnlineError(err));
     console.warn('Online score error:', err);
   }
 }
@@ -377,33 +410,55 @@ export async function fetchTopScores(mode, topN = 25) {
 
 export function renderGlobalScores(container, scores, mode, { showAll = false } = {}) {
   if (!container) return;
-  container.innerHTML = '';
+  clearChildren(container);
 
   if (!isFirebaseConfigured) {
-    container.innerHTML = '<div class="no-scores">Set Firebase env vars to enable global leaderboard.</div>';
+    const msg = document.createElement('div');
+    msg.className = 'no-scores';
+    msg.textContent = 'Set Firebase env vars to enable global leaderboard.';
+    container.appendChild(msg);
     return;
   }
 
   if (scores.length === 0) {
-    container.innerHTML = '<div class="no-scores">No global scores yet. Be the first!</div>';
+    const msg = document.createElement('div');
+    msg.className = 'no-scores';
+    msg.textContent = 'No global scores yet. Be the first!';
+    container.appendChild(msg);
     return;
   }
 
   const visible = showAll ? scores : scores.slice(0, 5);
+  const label = getModeLabel(mode);
 
   visible.forEach((score) => {
     const entry = document.createElement('div');
     entry.classList.add('score-entry');
-    const label = getModeLabel(mode);
-    entry.innerHTML = `
-      <div class="rank">${score.rank}.</div>
-      <div class="mode global-player-row">
-        ${renderSkinSwatchHtml(score.skinId || 'default')}
-        <span class="leaderboard-player-name">${score.displayName || 'Anonymous'}</span>
-      </div>
-      <div class="score">Level ${score.level || 1}</div>
-      <div class="date">${label}</div>
-    `;
+
+    const rank = document.createElement('div');
+    rank.className = 'rank';
+    rank.textContent = `${score.rank}.`;
+    entry.appendChild(rank);
+
+    const modeRow = document.createElement('div');
+    modeRow.className = 'mode global-player-row';
+    modeRow.appendChild(createSkinSwatchElement(score.skinId || 'default'));
+    const name = document.createElement('span');
+    name.className = 'leaderboard-player-name';
+    name.textContent = score.displayName || 'Anonymous';
+    modeRow.appendChild(name);
+    entry.appendChild(modeRow);
+
+    const levelEl = document.createElement('div');
+    levelEl.className = 'score';
+    levelEl.textContent = `Level ${score.level || 1}`;
+    entry.appendChild(levelEl);
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'date';
+    dateEl.textContent = label;
+    entry.appendChild(dateEl);
+
     container.appendChild(entry);
   });
 
@@ -460,12 +515,4 @@ export function initOnlineLeaderboard() {
   window.addEventListener('navigate:account', () => {
     window.dispatchEvent(new CustomEvent('menus:go-account'));
   });
-}
-
-if (!import.meta.env.PROD && typeof window !== 'undefined') {
-  window.__FIGGLE_DEV__ = {
-    ...(window.__FIGGLE_DEV__ || {}),
-    getActiveRunId,
-    clearActiveRun,
-  };
 }

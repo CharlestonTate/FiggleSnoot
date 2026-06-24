@@ -80,6 +80,8 @@ export async function signUp(email, password, displayName) {
     displayName: trimmedName,
     email: email.trim(),
     equippedSkin: 'default',
+    ownedSkins: ['default'],
+    coins: 0,
     createdAt: serverTimestamp(),
   });
   currentDisplayName = trimmedName;

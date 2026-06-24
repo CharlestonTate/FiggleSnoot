@@ -8,6 +8,7 @@ import { initCredits } from './credits.js';
 
 import { initIntegrity } from './integrity.js';
 import { initFormInputState, isFormInputActive } from './form-input-state.js';
+import { initDebug } from './debug.js';
 
 const pressedKeys = {};
 
@@ -81,7 +82,7 @@ function startAppSession() {
 function init() {
   initFormInputState();
   initIntegrity();
-
+  initDebug();
   initScreens();
 
   initTitleScreen();

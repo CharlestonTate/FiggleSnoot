@@ -1,3 +1,4 @@
+import Hammer from 'hammerjs';
 import { mobileControls, gameScreen } from './dom-elements.js';
 
 let hammer = null;
@@ -122,7 +123,7 @@ export function updateControlsVisibility() {
 }
 
 export function initHammer(onSwipe) {
-  if (!gameScreen || typeof Hammer === 'undefined') return;
+  if (!gameScreen) return;
 
   hammer = new Hammer(gameScreen, {
     touchAction: 'none',

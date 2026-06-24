@@ -10,8 +10,10 @@ import {
 import { walkingSoundEnabled, catModeEnabled } from './settings.js';
 import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold } from './controls.js';
 import { GameModes, initializeGameMode, handleLevelComplete } from './gamemodes.js';
-import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity, verifyRuntimeIntegrity, isIntegrityTriggered } from './integrity.js';
-import { getEquippedSkin, getSkinCssColor } from './skins.js';
+import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity, verifyRuntimeIntegrity, isIntegrityTriggered, maybeRevealOnHighScore } from './integrity.js';
+import { getEquippedSkin, getSkinCssColor, syncCoinsToCloud } from './skins.js';
+import { loadScoresFromStorage, saveScoresToStorage } from './scores-storage.js';
+import { registerLevelDebug } from './debug.js';
 
 let isGameOver = false;
 let gridSize = 7;
@@ -68,6 +70,15 @@ export function getCurrentGameMode() {
   return currentGameMode;
 }
 
+export function getLevel() {
+  return level;
+}
+
+export function setLevel(n) {
+  level = Math.max(1, parseInt(n, 10) || 1);
+  if (levelElement) levelElement.textContent = level;
+}
+
 export function updateCoinDisplay() {
   const el = document.getElementById('coin-count');
   if (el) el.textContent = getCoinCount();
@@ -77,7 +88,7 @@ export function updateCoinDisplay() {
 
 export function getCoinCount() {
   const n = parseInt(localStorage.getItem('figglesnoot_coins') || '0', 10);
-  return isNaN(n) ? 0 : n;
+  return Number.isNaN(n) ? 0 : n;
 }
 
 export function setCoinCount(count) {
@@ -86,23 +97,9 @@ export function setCoinCount(count) {
     localStorage.setItem('figglesnoot_coins', String(n));
   });
   updateCoinDisplay();
+  syncCoinsToCloud(n).catch(() => {});
 }
 
-// Console state
-let consoleVisible = false;
-let gameConsole = null;
-
-function toggleConsole() {
-    const consoleContainer = document.getElementById('console-container');
-    consoleContainer.style.display = consoleVisible ? 'none' : 'block';
-    
-    if (!consoleVisible && !gameConsole) {
-        gameConsole = new GameConsole();
-        gameConsole.init();
-    }
-    
-    consoleVisible = !consoleVisible;
-}
 
 export function startGame() {
   isGameOver = false;
@@ -625,10 +622,23 @@ function updateHUD() {
 }
 
 function endGame() {
-  if (isGameOver) return; // Prevent multiple calls to endGame()
+  if (isGameOver) return;
 
   verifyRuntimeIntegrity();
-  if (isIntegrityTriggered()) return;
+
+  const currentLevel = level || 1;
+  const scores = loadScoresFromStorage();
+  const modeScores = scores.filter((score) => score.mode === currentGameMode);
+  const prevBest = modeScores.length
+    ? Math.max(...modeScores.map((score) => score.level || 1))
+    : 0;
+  const isPersonalBest = currentLevel > prevBest;
+
+  maybeRevealOnHighScore({ isPersonalBest });
+  if (isIntegrityTriggered()) {
+    isGameOver = true;
+    return;
+  }
 
   stopMobileHold();
   
@@ -640,7 +650,6 @@ function endGame() {
   playSound(deathSound);
 
   // Save score to localStorage with level information
-  const scores = JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]');
   scores.push({
     mode: currentGameMode,
     level: level || 1, // Ensure level is at least 1
@@ -648,7 +657,7 @@ function endGame() {
     date: new Date().toISOString()
   });
   withTrustedStorageWrite(() => {
-    localStorage.setItem('figglesnoot_scores', JSON.stringify(scores));
+    saveScoresToStorage(scores);
   });
 
   // Handle death based on game mode
@@ -696,42 +705,44 @@ function restartGame() {
   startGame();
 }
 
+// Dev console removed — was broken without GameConsole implementation.
+
 function handleDeath(mode, gameState) {
-  // Get the death screen element
   const deathDisplay = document.getElementById('death-level-display');
-  
-  // Clear any existing content
-  deathDisplay.innerHTML = '';
-  
-  // Get all scores from localStorage
-  const scores = JSON.parse(localStorage.getItem('figglesnoot_scores') || '[]');
-  
-  // Find the highest level achieved in each mode
+  deathDisplay.replaceChildren();
+
+  const scores = loadScoresFromStorage();
+
   const highestLevels = {
-    base: Math.max(...scores.filter(score => score.mode === 'base').map(score => score.level || 1), 0),
-    timeAttack: Math.max(...scores.filter(score => score.mode === 'timeAttack').map(score => score.level || 1), 0),
-    blackout: Math.max(...scores.filter(score => score.mode === 'blackout').map(score => score.level || 1), 0)
+    base: Math.max(...scores.filter((score) => score.mode === 'base').map((score) => score.level || 1), 0),
+    timeAttack: Math.max(...scores.filter((score) => score.mode === 'timeAttack').map((score) => score.level || 1), 0),
+    blackout: Math.max(...scores.filter((score) => score.mode === 'blackout').map((score) => score.level || 1), 0),
   };
-  
-  // Check if this is a personal best in the current mode
+
   const isPersonalBest = gameState.level >= highestLevels[mode];
-  
-  // Add the level reached with animation class if it's a personal best
+
   if (isPersonalBest) {
-    // Create the high score container but don't add it to the DOM yet
     const highScoreContainer = document.createElement('div');
     highScoreContainer.classList.add('highscore-container');
-    
-    // Get mode name for display
-    const modeName = mode === 'base' ? 'Normal' : 
-                    mode === 'timeAttack' ? 'Time Attack' : 
-                    mode === 'blackout' ? 'Blackout' : 'Unknown';
-    
-    highScoreContainer.innerHTML = `
-      <span class="trophy">🏆</span>
-      <p class="highscore-text">New ${modeName} Mode Record: Level ${gameState.level}</p>
-      <span class="trophy">🏆</span>
-    `;
+
+    const modeName = mode === 'base' ? 'Normal'
+      : mode === 'timeAttack' ? 'Time Attack'
+        : mode === 'blackout' ? 'Blackout' : 'Unknown';
+
+    const leftTrophy = document.createElement('span');
+    leftTrophy.className = 'trophy';
+    leftTrophy.textContent = '🏆';
+    highScoreContainer.appendChild(leftTrophy);
+
+    const text = document.createElement('p');
+    text.className = 'highscore-text';
+    text.textContent = `New ${modeName} Mode Record: Level ${gameState.level}`;
+    highScoreContainer.appendChild(text);
+
+    const rightTrophy = document.createElement('span');
+    rightTrophy.className = 'trophy';
+    rightTrophy.textContent = '🏆';
+    highScoreContainer.appendChild(rightTrophy);
     
     // Add it to the DOM after a delay to match the animation
     setTimeout(() => {
@@ -740,10 +751,11 @@ function handleDeath(mode, gameState) {
       playSound(missionCompleteSound);
     }, 900); // Match the delay from our CSS animation
   } else {
-    deathDisplay.innerHTML = `<p>You reached Level ${gameState.level}</p>`;
-  
-    // Only show death message if it's not a high score
-  const deathMessage = GameModes[mode].onDeath(gameState);
+    const levelReached = document.createElement('p');
+    levelReached.textContent = `You reached Level ${gameState.level}`;
+    deathDisplay.appendChild(levelReached);
+
+    const deathMessage = GameModes[mode].onDeath(gameState);
   
   // Add the death message
   if (deathMessage && deathMessage.deathMessage) {
@@ -814,17 +826,7 @@ export function initGameControls() {
 }
 
 export function initConsole() {
-  if (import.meta.env.PROD) return;
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === '/' && !consoleVisible) {
-      event.preventDefault();
-      toggleConsole();
-    } else if (event.key === 'Escape' && consoleVisible) {
-      event.preventDefault();
-      toggleConsole();
-    }
-  });
+  /* Dev console removed */
 }
 
 export { movePlayer, isGameOver as getIsGameOver };
@@ -835,16 +837,15 @@ registerRunIntegrity(() => ({
   startedAt: runSession.startedAt,
   getCurrentLevel: () => level,
   isGameOver,
+  isMazeVisible,
+  expectedCells: gridSize * gridSize,
+  expectedObstacles: obstacles.length,
 }));
 
 registerProtectedFunction('game.endGame', endGame);
 registerProtectedFunction('game.movePlayer', movePlayer);
 registerProtectedFunction('game.checkWin', checkWin);
 registerProtectedFunction('game.startGame', startGame);
+registerProtectedFunction('game.renderMaze', renderMaze);
 
-if (!import.meta.env.PROD && typeof window !== 'undefined') {
-  window.__FIGGLE_DEV__ = {
-    ...(window.__FIGGLE_DEV__ || {}),
-    __forceLevel: (n) => { level = n; },
-  };
-}
+registerLevelDebug(getLevel, setLevel);

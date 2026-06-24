@@ -1,7 +1,7 @@
 /**
- * Client-side integrity: asset baselines, runtime function checks, storage guard,
- * and game-session validation. Catches casual DevTools/console tampering — not
- * a determined reverse engineer.
+ * Client-side integrity deterrent (UX only — not a security boundary).
+ * Flags DevTools tampering silently, then reveals "nice try" on a high score.
+ * Ranked/global scores must be validated server-side via Firestore rules or Functions.
  */
 
 const BASELINE_KEY = 'figglesnoot_integrity_baseline';
@@ -12,7 +12,9 @@ const GUARDED_KEYS = new Set([SCORE_KEY, COIN_KEY]);
 const RUNTIME_CHECK_MS = 4000;
 const ASSET_CHECK_MS = 20000;
 
-let triggered = false;
+let flagged = false;
+let revealed = false;
+const violations = new Set();
 let trustedWrite = false;
 let baselineHashes = null;
 let lastAssetCheck = 0;
@@ -91,7 +93,7 @@ function installStorageGuard() {
 
   function guardedSetItem(key, value) {
     if (GUARDED_KEYS.has(key) && !trustedWrite) {
-      triggerViolation('score_storage');
+      flagViolation('score_storage');
       return;
     }
     return origSet.call(this, key, value);
@@ -99,7 +101,7 @@ function installStorageGuard() {
 
   function guardedRemoveItem(key) {
     if (GUARDED_KEYS.has(key) && !trustedWrite) {
-      triggerViolation('score_storage');
+      flagViolation('score_storage');
       return;
     }
     return origRemove.call(this, key);
@@ -107,7 +109,7 @@ function installStorageGuard() {
 
   function guardedClear() {
     if (!trustedWrite) {
-      triggerViolation('score_storage');
+      flagViolation('score_storage');
       return;
     }
     return origClear.call(this);
@@ -159,8 +161,24 @@ export function withTrustedStorageWrite(fn) {
   }
 }
 
+/** Overlay is visible — gameplay and ranked submits are blocked. */
 export function isIntegrityTriggered() {
-  return triggered;
+  return revealed;
+}
+
+/** Tampering was detected but the player has not been shown "nice try" yet. */
+export function isIntegrityFlagged() {
+  return flagged;
+}
+
+export function getIntegrityViolations() {
+  return [...violations];
+}
+
+export function flagViolation(reason = 'unknown') {
+  flagged = true;
+  violations.add(reason);
+  console.warn('[FiggleSnoot] Integrity flag:', reason);
 }
 
 function showOverlay() {
@@ -168,36 +186,48 @@ function showOverlay() {
   if (!overlay) return;
   overlay.classList.remove('hidden');
   document.body.classList.add('integrity-lock');
-
-  const closeBtn = document.getElementById('integrity-close-button');
-  if (closeBtn && !closeBtn.dataset.wired) {
-    closeBtn.dataset.wired = '1';
-    closeBtn.addEventListener('click', () => {
-      window.close();
-      window.location.replace('about:blank');
-    });
-  }
+  document.getElementById('game-screen')?.classList.add('hidden');
+  document.getElementById('game-over-screen')?.classList.add('hidden');
 }
 
-export function triggerViolation(reason = 'unknown') {
-  if (triggered) return;
-  triggered = true;
-  console.warn('[FiggleSnoot] Integrity violation:', reason);
+/** Reveal the full-screen cheater message. */
+export function revealCheater() {
+  if (revealed) return;
+  revealed = true;
   showOverlay();
+}
+
+/**
+ * Call when the player achieves a personal or global best.
+ * Silently flagged cheaters only see "nice try" on a high score.
+ */
+export function maybeRevealOnHighScore({ isPersonalBest = false, isGlobalPB = false } = {}) {
+  if (!flagged || revealed) return false;
+  if (isPersonalBest || isGlobalPB) {
+    revealCheater();
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated Use flagViolation + maybeRevealOnHighScore */
+export function triggerViolation(reason = 'unknown', { immediate = false } = {}) {
+  flagViolation(reason);
+  if (immediate) revealCheater();
 }
 
 function verifyStorageGuard() {
   if (!storageGuardRefs) return true;
   if (Storage.prototype.setItem !== storageGuardRefs.setItem) {
-    triggerViolation('storage_bypass');
+    flagViolation('storage_bypass');
     return false;
   }
   if (Storage.prototype.removeItem !== storageGuardRefs.removeItem) {
-    triggerViolation('storage_bypass');
+    flagViolation('storage_bypass');
     return false;
   }
   if (Storage.prototype.clear !== storageGuardRefs.clear) {
-    triggerViolation('storage_bypass');
+    flagViolation('storage_bypass');
     return false;
   }
   return true;
@@ -206,10 +236,33 @@ function verifyStorageGuard() {
 function verifyProtectedFunctions() {
   for (const [name, { fn, hash }] of protectedFunctions) {
     if (fn.toString() !== hash) {
-      triggerViolation(`function_tamper:${name}`);
+      flagViolation(`function_tamper:${name}`);
       return false;
     }
   }
+  return true;
+}
+
+function verifyMazeIntegrity(snap) {
+  if (!snap || snap.isGameOver) return true;
+
+  const maze = document.getElementById('maze');
+  if (!maze) return true;
+
+  const cellCount = maze.children.length;
+  if (cellCount > 0 && snap.expectedCells > 0 && cellCount !== snap.expectedCells) {
+    flagViolation('maze_cells');
+    return false;
+  }
+
+  if (snap.isMazeVisible && snap.expectedObstacles > 0) {
+    const domObstacles = maze.querySelectorAll('.obstacle').length;
+    if (domObstacles !== snap.expectedObstacles) {
+      flagViolation('maze_obstacles');
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -219,31 +272,33 @@ function verifyRunSession() {
   const snap = runIntegrityGetter();
   if (!snap || snap.isGameOver) return true;
 
+  verifyMazeIntegrity(snap);
+
   const current = snap.getCurrentLevel?.() ?? 1;
   const peak = snap.peakLevel ?? 1;
   const cleared = snap.levelsCleared ?? 0;
   const startedAt = snap.startedAt ?? 0;
 
   if (current > peak) {
-    triggerViolation('level_tamper');
+    flagViolation('level_tamper');
     return false;
   }
   if (current > cleared + 1) {
-    triggerViolation('level_tamper');
+    flagViolation('level_tamper');
     return false;
   }
 
   const minMs = Math.max(0, (current - 1) * 700);
   if (current > 5 && performance.now() - startedAt < minMs) {
-    triggerViolation('speed_tamper');
+    flagViolation('speed_tamper');
     return false;
   }
 
-  return true;
+  return !flagged;
 }
 
 export function verifyRuntimeIntegrity() {
-  if (triggered) return false;
+  if (revealed) return false;
   if (!verifyStorageGuard()) return false;
   if (!verifyProtectedFunctions()) return false;
   if (!verifyRunSession()) return false;
@@ -251,10 +306,10 @@ export function verifyRuntimeIntegrity() {
 }
 
 export async function verifyIntegrity() {
-  if (triggered) return false;
+  if (revealed) return false;
 
   verifyRuntimeIntegrity();
-  if (triggered) return false;
+  if (revealed) return false;
 
   if (!import.meta.env.PROD || !baselineHashes) return true;
 
@@ -262,27 +317,29 @@ export async function verifyIntegrity() {
     const current = await snapshotAssets();
     for (const [url, hash] of Object.entries(baselineHashes)) {
       if (current[url] !== hash) {
-        triggerViolation('file_tamper');
+        flagViolation('file_tamper');
         return false;
       }
     }
   } catch {
     /* network blip — don't ban */
   }
-  return !triggered;
+  return !flagged;
 }
 
 export async function assertIntegrityForRankedAction() {
-  if (triggered) throw new Error('integrity_blocked');
   verifyRuntimeIntegrity();
-  if (triggered) throw new Error('integrity_blocked');
   await verifyIntegrity();
-  if (triggered) throw new Error('integrity_blocked');
+
+  if (flagged) {
+    revealCheater();
+    throw new Error('integrity_blocked');
+  }
 }
 
 function scheduleChecks() {
   setInterval(() => {
-    if (triggered) return;
+    if (revealed) return;
     verifyRuntimeIntegrity();
     const now = Date.now();
     if (import.meta.env.PROD && baselineHashes && now - lastAssetCheck >= ASSET_CHECK_MS) {
@@ -296,7 +353,8 @@ export async function initIntegrity() {
   installStorageGuard();
 
   registerProtectedFunction('integrity.withTrustedStorageWrite', withTrustedStorageWrite);
-  registerProtectedFunction('integrity.triggerViolation', triggerViolation);
+  registerProtectedFunction('integrity.flagViolation', flagViolation);
+  registerProtectedFunction('integrity.revealCheater', revealCheater);
 
   await cacheAssetsInBrowser();
 
@@ -311,19 +369,4 @@ export async function initIntegrity() {
   }
 
   scheduleChecks();
-
-  if (!import.meta.env.PROD && typeof window !== 'undefined') {
-    window.__FIGGLE_DEV__ = {
-      ...(window.__FIGGLE_DEV__ || {}),
-      simulateIntegrityViolation: () => triggerViolation('dev_test'),
-      verifyIntegrity,
-      verifyRuntimeIntegrity,
-      testScoreTamper: () => {
-        localStorage.setItem('figglesnoot_scores', '[]');
-      },
-      testLevelTamper: () => {
-        window.__FIGGLE_DEV__?.__forceLevel?.(999);
-      },
-    };
-  }
 }
