@@ -5,12 +5,12 @@ import { hideScreen, showScreen, switchScreens } from './screens.js';
 import {
   playSound, playWalkingSound, deathSound, levelCompleteSound, coinCollectSound,
   dyingSound, missionCompleteSound, birthdaySound, patterSound, pitterSound,
-  advanceMovementSound, getMovementSound,
+  advanceMovementSound, getMovementSound, warpWarpSound,
 } from './audio.js';
 import { walkingSoundEnabled, catModeEnabled } from './settings.js';
-import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold } from './controls.js';
+import { updateControlsVisibility, initHammer, isSwipeEnabled, initMobileControls, stopMobileHold, initShockwaveButton } from './controls.js';
 import { GameModes, initializeGameMode, handleLevelComplete } from './gamemodes.js';
-import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity, verifyRuntimeIntegrity, isIntegrityTriggered, maybeRevealOnHighScore } from './integrity.js';
+import { withTrustedStorageWrite, registerProtectedFunction, registerRunIntegrity } from './integrity.js';
 import { getEquippedSkin, getSkinCssColor, syncCoinsToCloud } from './skins.js';
 import { loadScoresFromStorage, saveScoresToStorage } from './scores-storage.js';
 import { registerLevelDebug } from './debug.js';
@@ -26,6 +26,15 @@ let goalPosition = {};
 let obstacles = [];
 let coinPosition = null;
 const COIN_SPAWN_CHANCE = 0.15;
+let shockwavePosition = null;
+const SHOCKWAVE_SPAWN_CHANCE = 0.07;
+let shockwaveCharges = 0;
+let shockwaveWaveRadius = -1;
+let shockwaveHoldUntil = 0;
+let shockwaveOrigin = { x: 0, y: 0 };
+let shockwaveAnimating = false;
+let shockwaveAnimFrame = null;
+let shockwaveRingEl = null;
 let gameInterval;
 let showMazeTimeout;
 let isMazeVisible = true;
@@ -108,6 +117,9 @@ export function startGame() {
   elapsedTime = 0;
   timerRunning = false;
   remainingTime = getModeInitialTimer();
+  shockwaveCharges = 0;
+  resetShockwaveState();
+  updateShockwaveUi();
 
   if (gameInterval) clearInterval(gameInterval);
   if (showMazeTimeout) clearTimeout(showMazeTimeout);
@@ -176,6 +188,8 @@ function initializeLevel() {
   goalPosition = placeGoalNearPath(path, playerPosition);
   obstacles = generateMaze(gridSize, path, goalPosition);
   coinPosition = trySpawnCoin(path, goalPosition, playerPosition);
+  shockwavePosition = trySpawnShockwave(path, goalPosition, playerPosition, coinPosition);
+  resetShockwaveState();
   isMazeVisible = true;
   hasMovedThisLevel = false;
 
@@ -295,23 +309,148 @@ function trySpawnCoin(path, goal, spawn) {
   return validCells[Math.floor(Math.random() * validCells.length)];
 }
 
+function trySpawnShockwave(path, goal, spawn, coin) {
+  if (Math.random() >= SHOCKWAVE_SPAWN_CHANCE) return null;
+  const obstacleSet = new Set(obstacles.map((o) => `${o.x},${o.y}`));
+  const goalKey = `${goal.x},${goal.y}`;
+  const spawnKey = `${spawn.x},${spawn.y}`;
+  const coinKey = coin ? `${coin.x},${coin.y}` : null;
+  const validCells = path.filter((p) => {
+    const key = `${p.x},${p.y}`;
+    return key !== goalKey && key !== spawnKey && key !== coinKey && !obstacleSet.has(key);
+  });
+  if (validCells.length === 0) return null;
+  return validCells[Math.floor(Math.random() * validCells.length)];
+}
+
+function resetShockwaveState() {
+  if (shockwaveAnimFrame) cancelAnimationFrame(shockwaveAnimFrame);
+  shockwaveAnimFrame = null;
+  shockwaveAnimating = false;
+  shockwaveWaveRadius = -1;
+  shockwaveHoldUntil = 0;
+  shockwaveRingEl?.remove();
+  shockwaveRingEl = null;
+  mazeContainer?.classList.remove('shockwave-active');
+}
+
+function chebyshevDist(ax, ay, bx, by) {
+  return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+}
+
+function isObstacleRevealed(x, y) {
+  if (isMazeVisible) return true;
+  if (shockwaveHoldUntil > performance.now()) return true;
+  if (shockwaveWaveRadius >= 0) {
+    return chebyshevDist(x, y, shockwaveOrigin.x, shockwaveOrigin.y) <= shockwaveWaveRadius;
+  }
+  return false;
+}
+
+function updateShockwaveRing() {
+  if (!shockwaveRingEl || !mazeContainer) return;
+  const cellSize = mazeContainer.children[0]?.offsetWidth || 40;
+  const gap = parseFloat(getComputedStyle(mazeContainer).gap) || 5;
+  const padding = parseFloat(getComputedStyle(mazeContainer).paddingLeft) || 20;
+  const step = cellSize + gap;
+  const size = shockwaveWaveRadius * 2 * step + cellSize;
+  const left = padding + shockwaveOrigin.x * step + cellSize / 2;
+  const top = padding + shockwaveOrigin.y * step + cellSize / 2;
+  shockwaveRingEl.style.setProperty('--ring-size', `${Math.max(size, cellSize)}px`);
+  shockwaveRingEl.style.left = `${left}px`;
+  shockwaveRingEl.style.top = `${top}px`;
+}
+
+export function updateShockwaveUi() {
+  const btn = document.getElementById('shockwave-btn');
+  if (!btn) return;
+  const ready = shockwaveCharges > 0 && !shockwaveAnimating;
+  btn.classList.toggle('hidden', shockwaveCharges <= 0);
+  btn.disabled = !ready;
+  btn.classList.toggle('shockwave-ready', ready);
+  btn.setAttribute('aria-label', ready ? `Shockwave (${shockwaveCharges})` : 'Shockwave');
+}
+
+export function triggerShockwave() {
+  if (isGameOver || isDeathAnimationPlaying || shockwaveCharges <= 0 || shockwaveAnimating) {
+    return false;
+  }
+
+  shockwaveCharges -= 1;
+  updateShockwaveUi();
+  shockwaveAnimating = true;
+  shockwaveOrigin = { ...playerPosition };
+  shockwaveWaveRadius = 0;
+  shockwaveHoldUntil = 0;
+
+  playSound(warpWarpSound);
+  mazeContainer.classList.add('shockwave-active');
+
+  if (!shockwaveRingEl) {
+    shockwaveRingEl = document.createElement('div');
+    shockwaveRingEl.className = 'shockwave-ring';
+    shockwaveRingEl.setAttribute('aria-hidden', 'true');
+    mazeContainer.appendChild(shockwaveRingEl);
+  }
+
+  const maxRadius = gridSize + 1;
+  const durationMs = 750;
+  const holdMs = 2200;
+  const start = performance.now();
+
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / durationMs);
+    shockwaveWaveRadius = t * maxRadius;
+    updateShockwaveRing();
+    renderMaze();
+
+    if (t < 1) {
+      shockwaveAnimFrame = requestAnimationFrame(tick);
+      return;
+    }
+
+    shockwaveWaveRadius = -1;
+    shockwaveHoldUntil = performance.now() + holdMs;
+    renderMaze();
+
+    shockwaveAnimFrame = requestAnimationFrame(function finishHold(holdNow) {
+      if (holdNow < shockwaveHoldUntil) {
+        shockwaveAnimFrame = requestAnimationFrame(finishHold);
+        return;
+      }
+      shockwaveAnimating = false;
+      shockwaveHoldUntil = 0;
+      mazeContainer.classList.remove('shockwave-active');
+      shockwaveRingEl?.remove();
+      shockwaveRingEl = null;
+      updateShockwaveUi();
+      renderMaze();
+    });
+  };
+
+  shockwaveAnimFrame = requestAnimationFrame(tick);
+  return true;
+}
+
 function addCoins(amount) {
   setCoinCount(getCoinCount() + (amount || 1));
 }
 
 function renderMaze() {
   mazeContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+  const ringSnapshot = shockwaveRingEl;
   mazeContainer.innerHTML = "";
+  if (ringSnapshot) shockwaveRingEl = ringSnapshot;
   
-  // Create obstacle lookup Set for O(1) performance instead of O(n) array.some()
   const obstacleSet = new Set(obstacles.map(o => `${o.x},${o.y}`));
   const playerKey = `${playerPosition.x},${playerPosition.y}`;
   const goalKey = `${goalPosition.x},${goalPosition.y}`;
   const coinKey = coinPosition ? `${coinPosition.x},${coinPosition.y}` : null;
+  const shockwaveKey = shockwavePosition ? `${shockwavePosition.x},${shockwavePosition.y}` : null;
   const playerSkinId = getEquippedSkin();
   const playerSkinColor = getSkinCssColor(playerSkinId);
+  const shockwaveActive = shockwaveWaveRadius >= 0 || shockwaveHoldUntil > performance.now();
   
-  // Use DocumentFragment for better performance (batch DOM operations)
   const fragment = document.createDocumentFragment();
   
   for (let y = 0; y < gridSize; y++) {
@@ -323,8 +462,9 @@ function renderMaze() {
       const isPlayer = cellKey === playerKey;
       const isGoal = cellKey === goalKey;
       const isCoin = coinKey !== null && cellKey === coinKey;
+      const isShockwavePickup = shockwaveKey !== null && cellKey === shockwaveKey;
+      const showObstacle = isObstacle && isObstacleRevealed(x, y);
 
-      // In blackout mode, make only the player and goal blocks black
       if (currentGameMode === 'blackout') {
         if (isPlayer) {
           cell.classList.add("player", `player-skin-${playerSkinId}`);
@@ -334,15 +474,19 @@ function renderMaze() {
         } else if (isGoal) {
           cell.classList.add("goal");
           cell.style.backgroundColor = '#000';
-        } else if (isMazeVisible && isObstacle) {
+        } else if (showObstacle) {
           cell.classList.add("obstacle");
-          cell.style.backgroundColor = '#000';
+          cell.style.backgroundColor = shockwaveActive && !isMazeVisible ? '#e63946' : '#000';
+          if (shockwaveActive && !isMazeVisible) cell.classList.add("shockwave-revealed");
         } else if (isMazeVisible && isCoin) {
           cell.classList.add("coin");
           cell.style.backgroundColor = '#FFE393';
+        } else if (isShockwavePickup) {
+          cell.classList.add("shockwave-pickup");
         }
       } else {
-        if (isMazeVisible || isPlayer || isGoal || isCoin) {
+        const showCell = isMazeVisible || isPlayer || isGoal || isCoin || isShockwavePickup || showObstacle;
+        if (showCell) {
           if (isPlayer) {
             cell.classList.add("player", `player-skin-${playerSkinId}`);
             if (!hasMovedThisLevel) cell.classList.add("spawn-glow");
@@ -353,12 +497,16 @@ function renderMaze() {
           if (isGoal) {
             cell.classList.add("goal"); 
           } 
-          if (isMazeVisible && isObstacle) {
+          if (showObstacle) {
             cell.classList.add("obstacle");
+            if (shockwaveActive && !isMazeVisible) cell.classList.add("shockwave-revealed");
           }
           if (isCoin) {
             cell.classList.add("coin");
             cell.style.backgroundColor = '#FFE393';
+          }
+          if (isShockwavePickup) {
+            cell.classList.add("shockwave-pickup");
           }
         }
       }
@@ -367,6 +515,10 @@ function renderMaze() {
   }
   
   mazeContainer.appendChild(fragment);
+  if (shockwaveRingEl) {
+    mazeContainer.appendChild(shockwaveRingEl);
+    updateShockwaveRing();
+  }
 }
 
 function movePlayer(dx, dy) {
@@ -387,6 +539,13 @@ function movePlayer(dx, dy) {
         playSound(coinCollectSound);
         addCoins(1);
         coinPosition = null;
+      }
+
+      if (shockwavePosition && newX === shockwavePosition.x && newY === shockwavePosition.y) {
+        playSound(warpWarpSound);
+        shockwaveCharges += 1;
+        shockwavePosition = null;
+        updateShockwaveUi();
       }
 
       // Use requestAnimationFrame for smoother rendering
@@ -624,22 +783,8 @@ function updateHUD() {
 function endGame() {
   if (isGameOver) return;
 
-  verifyRuntimeIntegrity();
-
-  const currentLevel = level || 1;
-  const scores = loadScoresFromStorage();
-  const modeScores = scores.filter((score) => score.mode === currentGameMode);
-  const prevBest = modeScores.length
-    ? Math.max(...modeScores.map((score) => score.level || 1))
-    : 0;
-  const isPersonalBest = currentLevel > prevBest;
-
-  maybeRevealOnHighScore({ isPersonalBest });
-  if (isIntegrityTriggered()) {
-    isGameOver = true;
-    return;
-  }
-
+  resetShockwaveState();
+  updateShockwaveUi();
   stopMobileHold();
   
   isGameOver = true;
@@ -812,6 +957,8 @@ export function initGameControls() {
     if (isGameOver || isDeathAnimationPlaying) return;
     movePlayer(dx, dy);
   });
+
+  initShockwaveButton(() => triggerShockwave());
 
   initHammer((event) => {
     if (isGameOver || gameScreen.classList.contains('hidden') || !isSwipeEnabled()) return;

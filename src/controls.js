@@ -71,6 +71,24 @@ function beginHold(button) {
   }, REPEAT_DELAY_MS);
 }
 
+export function initShockwaveButton(onTrigger) {
+  const btn = document.getElementById('shockwave-btn');
+  if (!btn) return;
+
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (btn.disabled) return;
+    btn.classList.add('pressed');
+    onTrigger?.();
+  });
+
+  const release = () => btn.classList.remove('pressed');
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointercancel', release);
+  btn.addEventListener('pointerleave', release);
+}
+
 export function initMobileControls(moveCallback) {
   if (!mobileControls || mobileControlsInitialized) return;
   mobileControlsInitialized = true;
@@ -79,6 +97,7 @@ export function initMobileControls(moveCallback) {
   mobileControls.addEventListener('pointerdown', (e) => {
     const button = e.target.closest('button');
     if (!button || !mobileControls.contains(button)) return;
+    if (button.id === 'shockwave-btn') return;
 
     e.preventDefault();
     if (button.setPointerCapture) {

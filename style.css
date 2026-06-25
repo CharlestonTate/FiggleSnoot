@@ -171,6 +171,7 @@ button:hover {
   margin: 0 auto;
   box-sizing: border-box;
   overflow: visible;
+  position: relative;
 }
 
 #game-screen {
@@ -221,7 +222,7 @@ button:hover {
   display: grid;
   grid-template-areas:
     ". up ."
-    "left . right"
+    "left shock right"
     ". down .";
   gap: 8px;
   margin-top: 20px;
@@ -291,6 +292,80 @@ button:hover {
 #down { grid-area: down; }
 #left { grid-area: left; }
 #right { grid-area: right; }
+#shockwave-btn { grid-area: shock; }
+
+#shockwave-btn.shockwave-btn {
+  font-size: 2.4rem;
+  min-width: 105px;
+  min-height: 105px;
+  background: linear-gradient(145deg, #7b2ff7, #f107a3);
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 18px rgba(123, 47, 247, 0.55), 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+#shockwave-btn.shockwave-ready {
+  animation: shockwave-btn-pulse 1.4s ease-in-out infinite;
+}
+
+#shockwave-btn:disabled {
+  opacity: 0.45;
+  animation: none;
+}
+
+@keyframes shockwave-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(123, 47, 247, 0.45), 0 4px 10px rgba(0, 0, 0, 0.35); }
+  50% { box-shadow: 0 0 28px rgba(241, 7, 163, 0.85), 0 0 40px rgba(123, 47, 247, 0.55); }
+}
+
+.cell.shockwave-pickup {
+  background: radial-gradient(circle at 50% 45%, #ffe066 0%, #7b2ff7 55%, #4a148c 100%) !important;
+  animation: shockwave-pickup-pulse 1.1s ease-in-out infinite;
+  box-shadow: 0 0 16px rgba(123, 47, 247, 0.75), inset 0 0 8px rgba(255, 255, 255, 0.35);
+}
+
+@keyframes shockwave-pickup-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.06); filter: brightness(1.15); }
+}
+
+.cell.obstacle.shockwave-revealed {
+  background: #e63946 !important;
+  animation: shockwave-obstacle-flash 0.35s ease-out;
+  box-shadow: 0 0 14px rgba(230, 57, 70, 0.85), inset 0 0 6px rgba(255, 200, 200, 0.5);
+}
+
+@keyframes shockwave-obstacle-flash {
+  0% { transform: scale(0.85); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+#maze.shockwave-active {
+  box-shadow: 0 0 36px rgba(123, 47, 247, 0.45), 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.shockwave-ring {
+  position: absolute;
+  width: var(--ring-size, 40px);
+  height: var(--ring-size, 40px);
+  margin-left: calc(var(--ring-size, 40px) / -2);
+  margin-top: calc(var(--ring-size, 40px) / -2);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 20px rgba(123, 47, 247, 0.9),
+    0 0 40px rgba(241, 7, 163, 0.55),
+    inset 0 0 24px rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, rgba(123, 47, 247, 0.25) 45%, transparent 70%);
+  animation: shockwave-ring-pulse 0.12s ease-out;
+}
+
+@keyframes shockwave-ring-pulse {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
 
 .time-popup {
   position: fixed;

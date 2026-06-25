@@ -1,7 +1,6 @@
 /**
- * Client-side integrity deterrent (UX only — not a security boundary).
- * Flags DevTools tampering silently, then reveals "nice try" on a high score.
- * Ranked/global scores must be validated server-side via Firestore rules or Functions.
+ * Client-side storage guard (UX helper — not a security boundary).
+ * Blocks direct localStorage tampering of scores/coins; ranked validation is server-side.
  */
 
 const BASELINE_KEY = 'figglesnoot_integrity_baseline';
@@ -181,39 +180,19 @@ export function flagViolation(reason = 'unknown') {
   console.warn('[FiggleSnoot] Integrity flag:', reason);
 }
 
-function showOverlay() {
-  const overlay = document.getElementById('integrity-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('hidden');
-  document.body.classList.add('integrity-lock');
-  document.getElementById('game-screen')?.classList.add('hidden');
-  document.getElementById('game-over-screen')?.classList.add('hidden');
-}
-
-/** Reveal the full-screen cheater message. */
+/** No-op — overlay removed; kept for dev helpers. */
 export function revealCheater() {
-  if (revealed) return;
   revealed = true;
-  showOverlay();
 }
 
-/**
- * Call when the player achieves a personal or global best.
- * Silently flagged cheaters only see "nice try" on a high score.
- */
-export function maybeRevealOnHighScore({ isPersonalBest = false, isGlobalPB = false } = {}) {
-  if (!flagged || revealed) return false;
-  if (isPersonalBest || isGlobalPB) {
-    revealCheater();
-    return true;
-  }
+/** No-op — overlay removed. */
+export function maybeRevealOnHighScore() {
   return false;
 }
 
-/** @deprecated Use flagViolation + maybeRevealOnHighScore */
-export function triggerViolation(reason = 'unknown', { immediate = false } = {}) {
+/** @deprecated */
+export function triggerViolation(reason = 'unknown') {
   flagViolation(reason);
-  if (immediate) revealCheater();
 }
 
 function verifyStorageGuard() {
@@ -298,11 +277,8 @@ function verifyRunSession() {
 }
 
 export function verifyRuntimeIntegrity() {
-  if (revealed) return false;
   if (!verifyStorageGuard()) return false;
-  if (!verifyProtectedFunctions()) return false;
-  if (!verifyRunSession()) return false;
-  return true;
+  return !flagged;
 }
 
 export async function verifyIntegrity() {
@@ -329,100 +305,11 @@ export async function verifyIntegrity() {
 
 export async function assertIntegrityForRankedAction() {
   verifyRuntimeIntegrity();
-  await verifyIntegrity();
-
   if (flagged) {
-    revealCheater();
     throw new Error('integrity_blocked');
   }
 }
 
-function scheduleChecks() {
-  setInterval(() => {
-    if (revealed) return;
-    verifyRuntimeIntegrity();
-    const now = Date.now();
-    if (import.meta.env.PROD && baselineHashes && now - lastAssetCheck >= ASSET_CHECK_MS) {
-      lastAssetCheck = now;
-      verifyIntegrity();
-    }
-  }, RUNTIME_CHECK_MS);
-}
-
-function installDevCommands() {
-  if (import.meta.env.PROD || typeof window === 'undefined') return;
-
-  window.__FIGGLE_DEV__ = {
-    ...(window.__FIGGLE_DEV__ || {}),
-
-    /** Show the white "nice try" screen immediately */
-    showNiceTry: () => {
-      flagViolation('dev_test');
-      revealCheater();
-    },
-
-    /** Alias for showNiceTry */
-    simulateIntegrityViolation: () => {
-      flagViolation('dev_test');
-      revealCheater();
-    },
-
-    /** Flag tampering silently — die with a PB to trigger the reveal */
-    flagCheater: (reason = 'dev_flag') => flagViolation(reason),
-
-    isCheaterFlagged: () => flagged,
-    isNiceTryVisible: () => revealed,
-    getViolations: () => getIntegrityViolations(),
-
-    /** Attempt to edit scores in console (flags silently, write blocked) */
-    testScoreTamper: () => {
-      localStorage.setItem('figglesnoot_scores', '[]');
-    },
-
-    /** Attempt to edit coins in console (flags silently, write blocked) */
-    testCoinTamper: () => {
-      localStorage.setItem('figglesnoot_coins', '9999');
-    },
-
-    /** Jump to level 999 — flags on next runtime check */
-    testLevelTamper: () => {
-      window.__FIGGLE_DEV__?.__forceLevel?.(999);
-    },
-
-    /** Strip obstacle cells from the maze DOM — flags on next runtime check */
-    testMazeTamper: () => {
-      document.querySelectorAll('#maze .obstacle').forEach((el) => {
-        el.classList.remove('obstacle');
-      });
-    },
-
-    /** Run integrity checks immediately instead of waiting for the interval */
-    runIntegrityCheck: () => verifyRuntimeIntegrity(),
-
-    verifyIntegrity,
-    verifyRuntimeIntegrity,
-  };
-}
-
 export async function initIntegrity() {
   installStorageGuard();
-
-  registerProtectedFunction('integrity.withTrustedStorageWrite', withTrustedStorageWrite);
-  registerProtectedFunction('integrity.flagViolation', flagViolation);
-  registerProtectedFunction('integrity.revealCheater', revealCheater);
-
-  await cacheAssetsInBrowser();
-
-  if (import.meta.env.PROD) {
-    baselineHashes = await snapshotAssets();
-    lastAssetCheck = Date.now();
-    try {
-      sessionStorage.setItem(BASELINE_KEY, JSON.stringify(baselineHashes));
-    } catch {
-      /* private mode */
-    }
-  }
-
-  scheduleChecks();
-  installDevCommands();
 }

@@ -4,7 +4,6 @@
  */
 import {
   flagViolation,
-  revealCheater,
   isIntegrityFlagged,
   isIntegrityTriggered,
   getIntegrityViolations,
@@ -33,13 +32,12 @@ export function initDebug() {
       console.log('[figgle] level =', levelGetter());
     },
 
-    /** Show the white "nice try" screen */
     showNiceTry() {
       flagViolation('debug');
-      revealCheater();
+      console.log('[figgle] nice try overlay removed — flag only');
     },
 
-    /** Flag tampering (die with a PB to trigger nice try) */
+    /** Flag tampering silently (storage guard only) */
     flag(reason = 'debug') {
       flagViolation(reason);
       console.log('[figgle] flagged:', reason);

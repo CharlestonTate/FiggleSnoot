@@ -24,7 +24,7 @@ import {
 
 import {
 
-  startGame, setCurrentGameMode, updateCoinDisplay, movePlayer,
+  startGame, setCurrentGameMode, updateCoinDisplay, movePlayer, triggerShockwave,
 
 } from './game.js';
 
@@ -315,6 +315,8 @@ function handleKeyboardNavigation(event) {
       case 'arrowleft': case 'a': movePlayer(-1, 0); break;
 
       case 'arrowright': case 'd': movePlayer(1, 0); break;
+
+      case ' ': triggerShockwave(); break;
 
     }
 

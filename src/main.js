@@ -27,6 +27,13 @@ document.addEventListener('keyup', (event) => {
 
 window.pressedKeys = pressedKeys;
 
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  if (reason?.name === 'AbortError' || reason?.code === 20) {
+    event.preventDefault();
+  }
+});
+
 
 
 function generateRandomMessage() {
