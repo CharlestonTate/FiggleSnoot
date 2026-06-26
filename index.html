@@ -6,6 +6,7 @@
   <title>FIGGLESNOOT</title>
   <link rel="icon" href="img/figgle1.png">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -244,17 +245,21 @@
     <div id="mobile-controls" class="hidden">
       <button id="up" type="button" aria-label="Up">&#9650;</button>
       <button id="left" type="button" aria-label="Left">&#9664;</button>
-      <button id="shockwave-btn" type="button" class="shockwave-btn hidden" aria-label="Shockwave" disabled>&#9889;</button>
+      <button id="shockwave-btn" type="button" class="shockwave-btn hidden" aria-label="Shockwave" disabled><i class="fa-solid fa-bolt" aria-hidden="true"></i></button>
       <button id="right" type="button" aria-label="Right">&#9654;</button>
       <button id="down" type="button" aria-label="Down">&#9660;</button>
     </div>
   </div>
   <div id="game-over-screen" class="screen hidden">
-    <h1 style="font-size: 3em;">YOU DIED!</h1>
-    <h2 id="death-level-display"></h2>
-    <div id="online-death-message" class="online-death-message hidden"></div>
-    <button id="restart-button">PLAY AGAIN AHHHH</button>
-    <button id="menu-button" style="margin-top: 20px;">BACK TO MENU</button>
+    <div class="game-over-content">
+      <h1 class="game-over-title">YOU DIED!</h1>
+      <div id="death-level-display" class="death-level-display"></div>
+      <div id="online-death-message" class="online-death-message hidden"></div>
+      <div class="game-over-actions">
+        <button id="restart-button" type="button">PLAY AGAIN AHHHH</button>
+        <button id="menu-button" type="button">BACK TO MENU</button>
+      </div>
+    </div>
   </div>
   
   <div id="bomb-confirmation-popup" class="screen hidden">
