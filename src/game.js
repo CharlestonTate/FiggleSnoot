@@ -795,6 +795,7 @@ function endGame() {
   playSound(deathSound);
 
   // Save score to localStorage with level information
+  const scores = loadScoresFromStorage();
   scores.push({
     mode: currentGameMode,
     level: level || 1, // Ensure level is at least 1
