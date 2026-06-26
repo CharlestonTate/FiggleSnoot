@@ -3,7 +3,7 @@ import {
   collection, doc, getDoc, getDocs, query, orderBy, limit, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
-import { db, functions, isFirebaseConfigured } from './firebase.js';
+import { getFirebaseDb, getFirebaseFunctions, isFirebaseConfigured, initFirebaseApp } from './firebase.js';
 import { isSignedIn, getCurrentUser, getDisplayName } from './auth.js';
 import { isOnline, withTimeout } from './network.js';
 import { playSound, selectSound } from './audio.js';
@@ -106,32 +106,43 @@ export async function startOnlineRun(mode) {
   const uid = getCurrentUser()?.uid;
   if (!uid) return null;
 
-  if (functions) {
-    try {
-      const fn = httpsCallable(functions, 'startRun');
-      const result = await withTimeout(fn({ mode }), 5000);
-      if (result.data?.runId) {
-        activeRunId = result.data.runId;
-        activeRunMode = mode;
-        return activeRunId;
+  try {
+    initFirebaseApp();
+    const functions = getFirebaseFunctions();
+    if (functions) {
+      try {
+        const fn = httpsCallable(functions, 'startRun');
+        const result = await withTimeout(fn({ mode }), 5000);
+        if (result.data?.runId) {
+          activeRunId = result.data.runId;
+          activeRunMode = mode;
+          return activeRunId;
+        }
+      } catch (err) {
+        console.warn('startRun unavailable — using Firestore rules path:', err);
       }
-    } catch (err) {
-      console.warn('startRun unavailable — using Firestore rules path:', err);
     }
-  }
 
-  activeRunId = `${SPARK_RUN_PREFIX}${mode}`;
-  activeRunMode = mode;
-  return activeRunId;
+    activeRunId = `${SPARK_RUN_PREFIX}${mode}`;
+    activeRunMode = mode;
+    return activeRunId;
+  } catch (err) {
+    console.warn('Online run start failed:', err);
+    return null;
+  }
 }
 
 async function fetchAllEntries(mode) {
+  initFirebaseApp();
+  const db = getFirebaseDb();
   if (!db) return [];
   const snap = await withTimeout(getDocs(collection(db, 'leaderboards', mode, 'entries')));
   return snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
 }
 
 async function submitScoreDirect(mode, level, time, uid) {
+  initFirebaseApp();
+  const db = getFirebaseDb();
   if (!db) return null;
 
   const entries = await fetchAllEntries(mode);
@@ -169,6 +180,8 @@ export async function getScoreComparison(mode, level, time) {
     return compareScoreLocally(entries, mode, level, time, uid);
   };
 
+  initFirebaseApp();
+  const functions = getFirebaseFunctions();
   if (functions) {
     try {
       const fn = httpsCallable(functions, 'getScoreComparison');
@@ -196,6 +209,8 @@ export async function submitScore(mode, level, time) {
     return null;
   }
 
+  initFirebaseApp();
+  const functions = getFirebaseFunctions();
   const useFunctions = functions && activeRunId && !activeRunId.startsWith(SPARK_RUN_PREFIX);
   if (useFunctions) {
     try {
@@ -382,7 +397,10 @@ export async function handleOnlineScoreResult({ mode, level, time }) {
 }
 
 export async function fetchTopScores(mode, topN = 25) {
-  if (!isFirebaseConfigured || !db || !isOnline()) return [];
+  if (!isFirebaseConfigured || !isOnline()) return [];
+  initFirebaseApp();
+  const db = getFirebaseDb();
+  if (!db) return [];
 
   const q = query(
     collection(db, 'leaderboards', mode, 'entries'),
@@ -477,6 +495,8 @@ export function renderGlobalScores(container, scores, mode, { showAll = false } 
 }
 
 export async function fetchUserGlobalEntries(uid) {
+  initFirebaseApp();
+  const db = getFirebaseDb();
   if (!db || !uid) return {};
   const modes = ['base', 'timeAttack', 'blackout'];
   const entries = {};

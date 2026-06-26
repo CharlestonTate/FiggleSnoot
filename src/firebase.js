@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth as createAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
@@ -22,10 +22,16 @@ let app = null;
 let auth = null;
 let db = null;
 let functions = null;
+let initialized = false;
 
-if (isFirebaseConfigured) {
+/** Initialize Firebase on first online use — not at page load. */
+export function initFirebaseApp() {
+  if (initialized || !isFirebaseConfigured) {
+    return initialized;
+  }
+
   app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
+  auth = createAuth(app);
   db = getFirestore(app);
   functions = getFunctions(app);
 
@@ -43,6 +49,24 @@ if (isFirebaseConfigured) {
   if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_USE_EMULATORS === 'true') {
     connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   }
+
+  initialized = true;
+  return true;
+}
+
+export function getFirebaseAuth() {
+  initFirebaseApp();
+  return auth;
+}
+
+export function getFirebaseDb() {
+  initFirebaseApp();
+  return db;
+}
+
+export function getFirebaseFunctions() {
+  initFirebaseApp();
+  return functions;
 }
 
 export { app, auth, db, functions };

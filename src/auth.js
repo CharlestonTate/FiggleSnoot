@@ -9,7 +9,7 @@ import {
   EmailAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, isFirebaseConfigured } from './firebase.js';
+import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured, initFirebaseApp } from './firebase.js';
 import { assertCleanDisplayName, assertCleanEmail } from './profanity-filter.js';
 import { initSkinsFromProfile } from './skins.js';
 let currentUser = null;
@@ -28,6 +28,7 @@ export function isSignedIn() {
 }
 
 async function loadUserProfile(uid) {
+  const db = getFirebaseDb();
   if (!db) return null;
   try {
     const snap = await getDoc(doc(db, 'users', uid));
@@ -39,7 +40,13 @@ async function loadUserProfile(uid) {
 }
 
 export function initAuth(onAuthChange) {
-  if (!isFirebaseConfigured || !auth) {
+  if (!isFirebaseConfigured) {
+    onAuthChange?.(null, null);
+    return;
+  }
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
+  if (!auth) {
     onAuthChange?.(null, null);
     return;
   }
@@ -65,6 +72,9 @@ export function initAuth(onAuthChange) {
 }
 
 export async function signUp(email, password, displayName) {
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
   if (!auth || !db) throw new Error('Firebase is not configured.');
   if (!email?.trim()) throw new Error('Enter your email.');
   if (!password) throw new Error('Enter a password.');
@@ -89,6 +99,8 @@ export async function signUp(email, password, displayName) {
 }
 
 export async function signIn(email, password) {
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
   if (!auth) throw new Error('Firebase is not configured.');
   if (!email?.trim()) throw new Error('Enter your email.');
   if (!password) throw new Error('Enter your password.');
@@ -101,6 +113,7 @@ export async function signIn(email, password) {
 }
 
 export async function logOut() {
+  const auth = getFirebaseAuth();
   if (!auth) return;
   await signOut(auth);
   currentUser = null;
@@ -108,6 +121,8 @@ export async function logOut() {
 }
 
 export async function resetPassword(email) {
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
   if (!auth) throw new Error('Firebase is not configured.');
   assertCleanEmail(email);
   await sendPasswordResetEmail(auth, email.trim());
@@ -116,6 +131,7 @@ export async function resetPassword(email) {
 const LEADERBOARD_MODES = ['base', 'timeAttack', 'blackout'];
 
 async function deleteUserFirestoreData(uid) {
+  const db = getFirebaseDb();
   if (!db || !uid) return;
   await Promise.all(LEADERBOARD_MODES.map((mode) =>
     deleteDoc(doc(db, 'leaderboards', mode, 'entries', uid)).catch(() => {})));
@@ -123,6 +139,9 @@ async function deleteUserFirestoreData(uid) {
 }
 
 export async function deleteMyGlobalScores() {
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
   const uid = currentUser?.uid;
   if (!auth || !db || !uid) throw new Error('Sign in to delete global scores.');
   await Promise.all(LEADERBOARD_MODES.map((mode) =>
@@ -130,6 +149,9 @@ export async function deleteMyGlobalScores() {
 }
 
 export async function deleteAccount(password) {
+  initFirebaseApp();
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
   if (!auth || !db) throw new Error('Firebase is not configured.');
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in.');

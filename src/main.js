@@ -1,11 +1,5 @@
 import { initScreens } from './screens.js';
-
-import { initTitleScreen, initPlayGate, initAppMenus } from './menus.js';
-
-import { initGameControls, initConsole } from './game.js';
-
-import { initCredits } from './credits.js';
-
+import { initTitleScreen, initPlayGate } from './title-gate.js';
 import { initIntegrity } from './integrity.js';
 import { initFormInputState, isFormInputActive } from './form-input-state.js';
 import { initDebug } from './debug.js';
@@ -31,44 +25,37 @@ window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
   if (reason?.name === 'AbortError' || reason?.code === 20) {
     event.preventDefault();
+    return;
+  }
+  const msg = reason?.message || String(reason || '');
+  if (msg.includes('Failed to fetch') || msg.includes('Load failed')) {
+    event.preventDefault();
   }
 });
 
-
-
 function generateRandomMessage() {
-
   const randomNum = Math.floor(Math.random() * 6) + 1;
-
   if (randomNum === 6) {
-
     console.log('Katie smells really bad today she has armpit sweat stains - Natahan');
-
   }
-
 }
-
-
 
 let sessionStarted = false;
 
-
-
-function startAppSession() {
-
+async function startAppSession() {
   if (sessionStarted) return;
-
   sessionStarted = true;
 
+  const [menus, game, credits] = await Promise.all([
+    import('./menus.js'),
+    import('./game.js'),
+    import('./credits.js'),
+  ]);
 
-
-  initAppMenus();
-
-  initGameControls();
-
-  initConsole();
-
-  initCredits();
+  menus.initAppMenus();
+  game.initGameControls();
+  game.initConsole();
+  credits.initCredits();
 
   generateRandomMessage();
 
@@ -76,37 +63,20 @@ function startAppSession() {
     import('./sound-test.js');
   }
 
-  import('./bootstrap-online.js').then(({ bootstrapOnlineServices }) => {
-
-    bootstrapOnlineServices();
-
-  });
-
+  menus.goToMenu();
 }
-
-
 
 function init() {
   initFormInputState();
   initIntegrity();
   initDebug();
   initScreens();
-
   initTitleScreen();
-
   initPlayGate(startAppSession);
 }
 
-
-
 if (document.readyState === 'loading') {
-
   document.addEventListener('DOMContentLoaded', init);
-
 } else {
-
   init();
-
 }
-
-

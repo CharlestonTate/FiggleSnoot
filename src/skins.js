@@ -1,6 +1,3 @@
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from './firebase.js';
-
 const OWNED_KEY = 'figglesnoot_owned_skins';
 const EQUIPPED_KEY = 'figglesnoot_equipped_skin';
 const COINS_KEY = 'figglesnoot_coins';
@@ -48,8 +45,14 @@ function writeCoinsLocal(count) {
 }
 
 async function syncUserEconomyToCloud(payload) {
-  if (!db) return;
   try {
+    const { initFirebaseApp, getFirebaseDb, isFirebaseConfigured } = await import('./firebase.js');
+    if (!isFirebaseConfigured) return;
+    initFirebaseApp();
+    const db = getFirebaseDb();
+    if (!db) return;
+
+    const { doc, setDoc } = await import('firebase/firestore');
     const { getCurrentUser } = await import('./auth.js');
     const uid = getCurrentUser()?.uid;
     if (!uid) return;
@@ -137,7 +140,7 @@ export function applyProfileEconomy(profile) {
 }
 
 export async function syncEquippedSkinToCloud(skinId) {
-  if (!catalogById[skinId] || !db) return;
+  if (!catalogById[skinId]) return;
   await syncUserEconomyToCloud({ equippedSkin: skinId });
 }
 

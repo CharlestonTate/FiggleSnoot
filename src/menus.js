@@ -1,6 +1,6 @@
 import {
 
-  playButton, restartButton, menuButton, menuButtons, gameModeButtons, deathButtons,
+  restartButton, menuButton, menuButtons, gameModeButtons, deathButtons,
 
   consoleContainer, bombConfirmationPopup, accountFab, menuHud,
 
@@ -10,7 +10,7 @@ import { switchScreens, isScreenVisible, getVisibleScreen, showScreen, navigateT
 
 import {
 
-  playSound, selectSound, dungSound, warpSound, birthdaySound, warfSound,
+  playSound, selectSound, dungSound, birthdaySound, warfSound,
 
 } from './audio.js';
 
@@ -30,7 +30,7 @@ import {
 
 import {
 
-  initSettings, handleSettingsNavigation, resetSettingsNav, loadSettings,
+  initSettings, handleSettingsNavigation, resetSettingsNav,
 
 } from './settings.js';
 
@@ -84,23 +84,6 @@ const leaderboardNav = createLeaderboardNav(leaderboardButtons);
 const bombNav = createBombNav(() => bombConfirmationPopup.querySelectorAll('.menu-button'));
 
 let appMenusInitialized = false;
-
-/** Title screen only — first PLAY click runs startAppSession then opens menu */
-export function initPlayGate(startAppSession) {
-  const enterGame = () => {
-    startAppSession();
-    goToMenu();
-  };
-
-  playButton.addEventListener('click', enterGame);
-
-  document.addEventListener('keydown', (event) => {
-    if (isScreenVisible('title') && event.key === 'Enter' && document.activeElement.tagName !== 'BUTTON') {
-      event.preventDefault();
-      enterGame();
-    }
-  });
-}
 
 /** Full menu + game UI — runs once after first PLAY */
 export function initAppMenus() {
@@ -283,7 +266,7 @@ export function initAppMenus() {
 
 
 
-function goToMenu() {
+export function goToMenu() {
   playSound(selectSound);
   navigateTo('menu');
   updateCoinDisplay();
@@ -370,48 +353,5 @@ function handleKeyboardNavigation(event) {
 
 }
 
-
-
-export function initTitleScreen() {
-
-  loadSettings();
-
-  updateCoinDisplay();
-
-
-
-  const titleText = document.querySelector('#title-screen h1');
-
-  titleText.innerHTML = '<span class="figgle">FIGGLE</span><span class="snoot">SNOOT</span>';
-
-
-
-  const titleState = { figgle: 'FIGGLE', snoot: 'SNOOT' };
-
-
-
-  titleText.querySelector('.figgle').addEventListener('click', () => {
-
-    playSound(warpSound);
-
-    titleState.figgle = titleState.figgle === 'FIGGLE' ? 'FOGGLER' : 'FIGGLE';
-
-    titleText.querySelector('.figgle').textContent = titleState.figgle;
-
-  });
-
-
-
-  titleText.querySelector('.snoot').addEventListener('click', () => {
-
-    playSound(warpSound);
-
-    titleState.snoot = titleState.snoot === 'SNOOT' ? 'SNITCH' : 'SNOOT';
-
-    titleText.querySelector('.snoot').textContent = titleState.snoot;
-
-  });
-
-}
 
 

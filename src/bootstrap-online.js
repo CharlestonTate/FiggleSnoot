@@ -38,6 +38,8 @@ function clearAccountOfflineHint() {
 }
 
 async function loadOnlineModules() {
+  const { initFirebaseApp } = await import('./firebase.js');
+  initFirebaseApp();
   const [auth, online] = await Promise.all([
     import('./auth.js'),
     import('./online-leaderboard.js'),
